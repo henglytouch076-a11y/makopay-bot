@@ -315,6 +315,7 @@ const ANIM = {
   PARTY: '<tg-emoji emoji-id="5461151367559141950">🎉</tg-emoji>',
   WARN: '<tg-emoji emoji-id="5447644880824181073">⚠️</tg-emoji>',
   ID: '<tg-emoji emoji-id="5334544901428229844">ℹ️</tg-emoji>',
+  INFO: '<tg-emoji emoji-id="5334544901428229844">ℹ️</tg-emoji>',
   CALENDAR: '<tg-emoji emoji-id="5413879192267805083">🗓</tg-emoji>',
   DOWN: '<tg-emoji emoji-id="5406745015365943482">⬇️</tg-emoji>',
   CHAT: '<tg-emoji emoji-id="5443038326535759644">💬</tg-emoji>',
@@ -324,7 +325,7 @@ const ANIM = {
   LOCK: '<tg-emoji emoji-id="5296369303661067030">🔒</tg-emoji>',
   BACK: '<tg-emoji emoji-id="5363896514655564837">⬅️</tg-emoji>',
   HOURGLASS: '<tg-emoji emoji-id="5386367538735104399">⌛</tg-emoji>',
-  CARD: '<tg-emoji emoji-id="5445353829304387411">💳</tg-emoji>',
+  CARD: '<tg-emoji emoji-id="5472250091332993630">💳</tg-emoji>',
   GAME: '<tg-emoji emoji-id="5409125874651903587">🎮</tg-emoji>',
   SHIELD: '<tg-emoji emoji-id="5251203410396458957">🛡</tg-emoji>',
   SIREN: '<tg-emoji emoji-id="5395695537687123235">🚨</tg-emoji>',
@@ -359,7 +360,7 @@ const BTN_ICONS = {
   DIAMOND: '5427168083074628963',
   EDIT: '5395444784611480792',
   CANCEL: '5210952531676504517',
-  CARD: '5445353829304387411',
+  CARD: '5472250091332993630',
   SHIELD: '5251203410396458957',
   CAMERA: '5332798318617567350',
   QR: '6169985503006296081',
@@ -1006,7 +1007,7 @@ async function processSuccessfulTopup(tranId) {
     `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${tx.usdAmount.toFixed(2)} USD</b>\n` +
     `━━━━━━━━━━━━━━━\n` +
     `${ANIM.CROWN} <b>អតិថិជន:</b> <a href="tg://user?id=${tx.userId}">${user.name || 'User'}</a>${userHandle}\n` +
-    `${ANIM.SHIELD} <b>Telegram ID:</b> <code>${tx.userId}</code>\n` +
+    `${ANIM.INFO} <b>Telegram ID:</b> <code>${tx.userId}</code>\n` +
     `${ANIM.RECEIPT} <b>លេខវិក្កយបត្រ:</b> <code>${tx.tranId}</code>\n` +
     `<b>កាលបរិច្ឆេទ:</b> <code>${new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</code>`;
 
@@ -2672,71 +2673,62 @@ bot.action(/adm_td_(.+)/, async (ctx) => {
     tranId
   }).catch(err => console.warn('[MobCash Async Dispatch Warning]:', err.message));
 
-  // Edit message in-place to match Image 1 format with Admin Name who completed it
-  const userHandle = (req.username && req.username !== 'គ្មាន' && req.username !== '@គ្មាន')
-    ? ` (${req.username.startsWith('@') ? req.username : `@${req.username}`})`
-    : '';
+  // 1. Remove admin message from Admin Top-Up group as requested
+  await ctx.deleteMessage().catch(() => { });
 
-  const doneAdminText =
-    `${ANIM.CARD} <b>MAKO CAMBO BOT</b>\n` +
-    `${ANIM.SUCCESS} <b>បានបញ្ចូលទឹកប្រាក់ជោគជ័យ</b>\n\n` +
-    `${getAdminBankLine(req.bank)}\n` +
-    `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${req.oneXBetId}</code>\n` +
-    `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(req.amount).toFixed(2)} USD</b>\n` +
-    `━━━━━━━━━━━━━━━\n` +
-    `${ANIM.CROWN} <b>អតិថិជន:</b> ${req.name}${userHandle}\n` +
-    `${ANIM.SHIELD} <b>Telegram ID:</b> <code>${req.userId}</code>\n` +
-    `${ANIM.OFFICER} <b>បញ្ចូលដោយ Admin:</b> <b>${adminName}</b>\n` +
-    `${ANIM.RECEIPT} <b>លេខវិក្កយបត្រ:</b> <code>${tranId}</code>\n` +
-    `<b>កាលបរិច្ឆេទ:</b> <code>${req.date || new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</code>`;
-
-  await ctx.editMessageText(doneAdminText, {
-    parse_mode: 'HTML',
-    reply_markup: { inline_keyboard: [] }
-  }).catch(async () => {
-    await ctx.deleteMessage().catch(() => { });
-    await bot.telegram.sendMessage(ctx.chat.id, doneAdminText, { parse_mode: 'HTML' }).catch(() => { });
-  });
-
-  // Update persistent history
+  // 2. Store & update in persistent history
+  const histItem = transactionsHistory.find(h => h.id === tranId);
+  if (histItem) {
+    histItem.completedBy = adminName;
+    histItem.status = 'COMPLETED';
+    histItem.updatedAt = Date.now();
+    saveHistoryToDisk();
+  } else {
+    addHistoryRecord({
+      id: tranId,
+      type: 'topup',
+      userId: req.userId,
+      chatId: req.chatId || req.userId,
+      name: req.name,
+      username: req.username,
+      oneXBetId: req.oneXBetId,
+      amount: req.amount,
+      bank: req.bank,
+      status: 'COMPLETED',
+      completedBy: adminName,
+      date: req.date || new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })
+    });
+  }
   updateHistoryStatus(tranId, 'COMPLETED');
 
-  // Replace waiting message for User in-place with success message (no stacking / no new message)
+  // 3. Send back to User: Remove old waiting message and show new completion message (Image 3 format)
   const targetChatId = req.chatId || req.userId;
   if (targetChatId) {
-    const userText =
-      `${ANIM.SUCCESS} <b>បញ្ចូលប្រាក់ជោគជ័យ (SUCCESSFUL)!</b>\n` +
-      `━━━━━━━━━━━━━━\n` +
-      `💎 <b>ID 1xBet:</b> <code>${req.oneXBetId}</code>\n` +
-      `💲 <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(req.amount).toFixed(2)} USD</b>\n` +
-      `🧾 <b>លេខវិក្កយបត្រ:</b> <code>${tranId}</code>\n` +
-      `━━━━━━━━━━━━━━\n` +
-      `${ANIM.SUCCESS} <i><b>ទឹកប្រាក់បានចូលគណនី 1xBet រួចរាល់ហើយ!</b></i>`;
+    const checkEmoji = '<tg-emoji emoji-id="5206607081334906820">✔️</tg-emoji>';
+    const diamondEmoji = '<tg-emoji emoji-id="5427168083074628963">💎</tg-emoji>';
+    const moneyEmoji = '<tg-emoji emoji-id="5409048419211682843">💵</tg-emoji>';
+    const receiptEmoji = '<tg-emoji emoji-id="5444856076954520455">🧾</tg-emoji>';
+
+    const userSuccessText =
+      `${checkEmoji} <b>ការបញ្ចូលទឹកប្រាក់ទទួលបានជោគជ័យ (TOPUP SUCCESSFUL)!</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `${diamondEmoji} <b>ID 1xBet:</b> <code>${req.oneXBetId}</code>\n` +
+      `${moneyEmoji} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(req.amount).toFixed(2)} USD</b>\n` +
+      `${receiptEmoji} <b>លេខវិក្កយបត្រ:</b> <code>${tranId}</code>\n\n` +
+      `${checkEmoji} <i><b>សូមពិនិត្យមើលក្នុងគណនី 1xBet របស់អ្នក។</b></i>\n` +
+      `<i><b>អរគុណសម្រាប់ការប្រើប្រាស់សេវាកម្ម!</b></i>`;
 
     const waitMsgId = req.userWaitMsgId || userActiveMsgs.get(targetChatId);
-    let edited = false;
     if (waitMsgId) {
-      try {
-        await bot.telegram.editMessageText(targetChatId, waitMsgId, null, userText, {
-          parse_mode: 'HTML',
-          reply_markup: { inline_keyboard: [] }
-        });
-        edited = true;
-      } catch (e) {
-        try {
-          await bot.telegram.deleteMessage(targetChatId, waitMsgId).catch(() => { });
-        } catch (_) { }
-      }
+      await bot.telegram.deleteMessage(targetChatId, waitMsgId).catch(() => { });
     }
 
-    if (!edited) {
-      const sent = await bot.telegram.sendMessage(targetChatId, userText, {
-        parse_mode: 'HTML',
-        reply_markup: { inline_keyboard: [] }
-      }).catch(err => console.error('Failed to send success to user:', err.message));
-      if (sent?.message_id) {
-        userActiveMsgs.set(targetChatId, sent.message_id);
-      }
+    const sent = await bot.telegram.sendMessage(targetChatId, userSuccessText, {
+      parse_mode: 'HTML'
+    }).catch(err => console.error('Failed to send success to user:', err.message));
+
+    if (sent?.message_id) {
+      userActiveMsgs.set(targetChatId, sent.message_id);
     }
   }
 
