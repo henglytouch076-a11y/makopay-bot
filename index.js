@@ -1501,8 +1501,26 @@ bot.use(async (ctx, next) => {
     }
   }
 
+  // Ensure user always has the latest active Mini App URL configured on their 'MaKo' menu button
+  if (ctx.chat?.type === 'private' && activeMiniappUrl && activeMiniappUrl.startsWith('https://')) {
+    const key = `${ctx.chat.id}_${activeMiniappUrl}`;
+    if (!usersWithLiveMenuButton.has(key)) {
+      usersWithLiveMenuButton.add(key);
+      bot.telegram.callApi('setChatMenuButton', {
+        chat_id: ctx.chat.id,
+        menu_button: {
+          type: 'web_app',
+          text: 'MaKo',
+          web_app: { url: activeMiniappUrl }
+        }
+      }).catch(() => {});
+    }
+  }
+
   return next();
 });
+
+const usersWithLiveMenuButton = new Set();
 
 // ---------------- COMMANDS ----------------
 
@@ -1511,9 +1529,10 @@ bot.start(async (ctx) => {
   await ctx.deleteMessage().catch(() => { });
   userStates.delete(ctx.from.id);
 
-  // Set MaKo web_app menu button for this user
+  // Set MaKo web_app menu button for this user immediately
   if (activeMiniappUrl && activeMiniappUrl.startsWith('https://')) {
-    bot.telegram.setChatMenuButton({
+    usersWithLiveMenuButton.add(`${ctx.chat.id}_${activeMiniappUrl}`);
+    bot.telegram.callApi('setChatMenuButton', {
       chat_id: ctx.chat.id,
       menu_button: {
         type: 'web_app',
@@ -3782,9 +3801,12 @@ async function registerMenuButton(url) {
   if (!url || !url.startsWith('https://')) return;
   if (lastRegisteredMenuUrl === url) return;
   lastRegisteredMenuUrl = url;
+  if (typeof usersWithLiveMenuButton !== 'undefined') {
+    usersWithLiveMenuButton.clear();
+  }
 
   try {
-    await bot.telegram.setChatMenuButton({
+    await bot.telegram.callApi('setChatMenuButton', {
       menu_button: {
         type: 'web_app',
         text: 'MaKo',
@@ -3792,8 +3814,24 @@ async function registerMenuButton(url) {
       }
     }).catch(() => {});
 
+    // Update all known users in database so their menu button works immediately!
+    if (Array.isArray(users)) {
+      for (const u of users) {
+        if (u.id) {
+          bot.telegram.callApi('setChatMenuButton', {
+            chat_id: Number(u.id),
+            menu_button: {
+              type: 'web_app',
+              text: 'MaKo',
+              web_app: { url }
+            }
+          }).catch(() => {});
+        }
+      }
+    }
+
     if (ADMIN_CHAT_ID) {
-      bot.telegram.setChatMenuButton({
+      bot.telegram.callApi('setChatMenuButton', {
         chat_id: Number(ADMIN_CHAT_ID),
         menu_button: {
           type: 'web_app',
@@ -3803,7 +3841,7 @@ async function registerMenuButton(url) {
       }).catch(() => {});
     }
 
-    console.log(`✅ Telegram WebApp Menu Button 'MaKo' configured with: ${url}`);
+    console.log(`✅ Telegram WebApp Menu Button 'MaKo' configured for all chats with: ${url}`);
   } catch (err) {
     console.warn('Could not set ChatMenuButton:', err.message);
   }
