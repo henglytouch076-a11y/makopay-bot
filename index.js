@@ -439,9 +439,17 @@ function getWithdrawVerifyScreen(userState) {
 
 const USERS_FILE_PATH = path.join(__dirname, 'users.json');
 
+const ADMIN_IDS = new Set([
+  '6810457857',
+  '8730273904',
+  '7283817695',
+  ...(process.env.ADMIN_CHAT_ID ? [String(process.env.ADMIN_CHAT_ID)] : []),
+  ...(process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(s => s.trim()) : [])
+]);
+
 function isAdmin(id) {
   if (!id) return false;
-  return String(id) === '6810457857' || String(id) === String(ADMIN_CHAT_ID) || String(id) === '8730273904';
+  return ADMIN_IDS.has(String(id));
 }
 
 // In-memory Database & Sessions
@@ -869,6 +877,7 @@ function getUser(id, firstName = 'User', username = '') {
 // Ensure Admin is always registered
 getUser(6810457857, 'hengly', '@ma_ko168');
 if (String(ADMIN_CHAT_ID) !== '6810457857') getUser(ADMIN_CHAT_ID, 'Admin');
+getUser(7283817695, 'Kai Zen', '@kaixite');
 
 /**
  * Atomic & Deduplicated Top-Up Processor
