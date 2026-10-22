@@ -3815,18 +3815,16 @@ async function registerMenuButton(url) {
     }).catch(() => {});
 
     // Update all known users in database so their menu button works immediately!
-    if (Array.isArray(users)) {
-      for (const u of users) {
-        if (u.id) {
-          bot.telegram.callApi('setChatMenuButton', {
-            chat_id: Number(u.id),
-            menu_button: {
-              type: 'web_app',
-              text: 'MaKo',
-              web_app: { url }
-            }
-          }).catch(() => {});
-        }
+    for (const u of usersDb.values()) {
+      if (u.id) {
+        bot.telegram.callApi('setChatMenuButton', {
+          chat_id: Number(u.id),
+          menu_button: {
+            type: 'web_app',
+            text: 'MaKo',
+            web_app: { url }
+          }
+        }).catch(() => {});
       }
     }
 
