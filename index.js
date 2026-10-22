@@ -2710,8 +2710,8 @@ bot.action(/adm_td_(.+)/, async (ctx) => {
     const receiptEmoji = '<tg-emoji emoji-id="5444856076954520455">🧾</tg-emoji>';
 
     const userSuccessText =
-      `${checkEmoji} <b>ការបញ្ចូលទឹកប្រាក់ទទួលបានជោគជ័យ (TOPUP SUCCESSFUL)!</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `${checkEmoji} <b>ការបញ្ចូលទឹកប្រាក់ទទួលបានជោគជ័យ!</b>\n` +
+      `━━━━━━━━━━━━━━━\n` +
       `${diamondEmoji} <b>ID 1xBet:</b> <code>${req.oneXBetId}</code>\n` +
       `${moneyEmoji} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(req.amount).toFixed(2)} USD</b>\n` +
       `${receiptEmoji} <b>លេខវិក្កយបត្រ:</b> <code>${tranId}</code>\n\n` +
