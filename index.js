@@ -1408,18 +1408,7 @@ async function checkAbaPaymentStatus(token, clientId, stateRequestTime, deviceId
 
 async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
   const isAba = String(bank).toLowerCase() === 'aba';
-
-  if (isAba) {
-    try {
-      const abaResult = await generateAbaPaywayPayment(amount, currency);
-      return abaResult;
-    } catch (abaErr) {
-      console.warn('⚠️ Direct ABA PayWay generation fallback notice:', abaErr.message);
-      // If direct generation fails, fallback to PayLinkAPI
-    }
-  }
-
-  const endpoint = String(bank).toLowerCase() === 'bakong' ? 'bakong' : 'aba';
+  const endpoint = isAba ? 'aba' : 'bakong';
   const url = `${PAYLINK_BASE_URL}/api/${endpoint}/generate-qr`;
   const response = await fetch(url, {
     method: 'POST',
@@ -1440,29 +1429,21 @@ async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
   if (isAba) {
     data.bank = 'ABA';
     data.merchantName = ADMIN_ABA_NAME || 'MAKO by H.T';
+    if (!data.deepLink && data.qrString) {
+      data.deepLink = `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}`;
+    }
+    if (!data.androidIntent && data.qrString) {
+      data.androidIntent = `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end`;
+    }
+  } else {
+    data.bank = 'BAKONG';
   }
   return data;
 }
 
 async function checkPaymentStatus(tranId, md5, tx = null) {
   const transaction = tx || pendingTxs.get(tranId);
-  if (transaction && transaction.bank === 'aba' && transaction.token && transaction.clientId) {
-    try {
-      const abaRes = await checkAbaPaymentStatus(
-        transaction.token,
-        transaction.clientId,
-        transaction.stateRequestTime,
-        transaction.deviceId
-      );
-      if (abaRes.paid || abaRes.status === 'PAID') {
-        return { success: true, paid: true, status: 'PAID' };
-      }
-      return { success: true, paid: false, status: 'PENDING' };
-    } catch (err) {
-      console.warn('ABA status check error:', err.message);
-      return { success: true, paid: false, status: 'PENDING' };
-    }
-  }
+  const targetMd5 = md5 || transaction?.md5;
 
   const url = `${PAYLINK_BASE_URL}/api/web/check-payment`;
   const response = await fetch(url, {
@@ -1471,7 +1452,7 @@ async function checkPaymentStatus(tranId, md5, tx = null) {
       'Content-Type': 'application/json',
       'x-api-key': PAYLINK_API_KEY
     },
-    body: JSON.stringify({ tranId, md5: md5 || transaction?.md5 })
+    body: JSON.stringify({ tranId, md5: targetMd5 })
   });
 
   if (!response.ok) {
