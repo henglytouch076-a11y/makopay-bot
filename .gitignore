@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment Variables & Secrets
+.env
+.env.*
+
+# Local Database & State
+users.json
+history.json
+topup_requests.json
+withdraw_requests.json
+media_cache.json
+
+# Binaries & executables
+*.exe
+cloudflared.exe
+
+# Raw recording files
+*.MOV
+
+# System / logs
+*.log
+.DS_Store
+Thumbs.db

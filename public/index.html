@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f19" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>MAKO CAMBO — 1xBet Cashier</title>
+  
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Google Fonts: Kantumruy Pro (Khmer) + Outfit (English/Numbers) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Stylesheet (Cache-busted) -->
+  <link rel="stylesheet" href="style.css?v=2.4.0" />
+</head>
+<body>
+  <div id="app" class="app-wrapper">
+    
+    <!-- Top Bar -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo-box">
+          <span class="logo-1x">1X</span>
+          <span class="online-indicator"></span>
+        </div>
+        <div class="header-titles">
+          <div class="brand-row">
+            <span class="brand-title">MAKO CAMBO</span>
+            <span class="badge-vip">VIP</span>
+          </div>
+          <span class="brand-subtitle">1xBet Cashier • <span class="text-emerald">24/7 Live</span></span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <button id="btnChannel" class="header-icon-btn" title="VIP Channel">
+          <svg viewBox="0 0 24 24" class="svg-ico"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+        </button>
+        <button id="btnSupport" class="header-icon-btn" title="Support">
+          <svg viewBox="0 0 24 24" class="svg-ico"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </button>
+        <button id="btnWalletPill" class="wallet-chip" title="My Balance">
+          <svg viewBox="0 0 24 24" class="wallet-svg"><path fill="currentColor" d="M21 7.28V5c0-1.1-.9-2-2-2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-2.28c.59-.35 1-.98 1-1.72V9c0-.74-.41-1.37-1-1.72zM20 9v6h-7V9h7zM5 19V5h14v2h-6c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h6v2H5z"/></svg>
+          <span id="headerBalanceText" class="balance-num">$0.00</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Screens Container -->
+    <main class="app-main">
+
+      <!-- ================= TAB 1: ដាក់ប្រាក់ (TOP-UP) ================= -->
+      <section id="tabTopUp" class="tab-view active">
+        
+        <!-- Hero Brand Card with Welcome Video -->
+        <div class="hero-brand-card">
+          <div class="hero-image-wrap hero-video-wrap">
+            <video
+              id="heroWelcomeVideo"
+              class="hero-welcome-video"
+              src="videwellcome.mp4"
+              poster="logo.png"
+              autoplay
+              loop
+              muted
+              playsinline
+              webkit-playsinline
+              preload="auto"
+            ></video>
+            <button type="button" id="btnToggleVideoSound" class="video-sound-toggle-btn" aria-label="Toggle Sound" title="បើក/បិទសំឡេង">
+              <svg id="iconMuted" viewBox="0 0 24 24" class="sound-ico"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M11 5 6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/></svg>
+              <svg id="iconUnmuted" viewBox="0 0 24 24" class="sound-ico" style="display:none;"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M11 5 6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            </button>
+          </div>
+          <div class="hero-badges-row">
+            <span class="pill-badge status-live">
+              <span class="pulsing-dot"></span>
+              24/7 Auto Cashier
+            </span>
+            <span class="pill-badge official-badge">
+              <svg viewBox="0 0 24 24" class="badge-ico"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m9 12 2 2 4-4"/></svg>
+              Official Gateway
+            </span>
+            <span class="pill-badge fee-badge">
+              <svg viewBox="0 0 24 24" class="badge-ico"><polygon fill="currentColor" points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              0% ថ្លៃសេវា
+            </span>
+          </div>
+        </div>
+
+        <!-- Form View (Normal Deposit State) -->
+        <div id="topupFormView" class="clean-card main-form-card">
+          
+          <div class="view-header">
+            <div>
+              <h2 class="view-title">ដាក់ប្រាក់ 1xBet (Top-Up)</h2>
+              <p class="view-desc">បញ្ចូលប្រាក់ស្វ័យប្រវត្តិតាម KHQR លឿនរហ័ស 1-2 នាទី</p>
+            </div>
+            <span class="badge-tag">
+              <svg viewBox="0 0 24 24" class="tag-ico"><polygon fill="currentColor" points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              ស្វ័យប្រវត្តិ
+            </span>
+          </div>
+
+          <!-- Section 1: 1xBet ID -->
+          <div class="form-section">
+            <div class="section-label-row">
+              <label for="inputOneXBetId" class="section-label">
+                <svg viewBox="0 0 24 24" class="label-svg"><rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 8h3M15 12h3M7 16h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <span>លេខសម្គាល់ ID 1xBet</span>
+              </label>
+              <button type="button" id="btnPasteId" class="link-btn">
+                <svg viewBox="0 0 24 24" class="btn-inline-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                <span>Paste</span>
+              </button>
+            </div>
+            
+            <div class="input-box">
+              <input
+                type="text"
+                id="inputOneXBetId"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                placeholder="ឧទាហរណ៍៖ 1407771169"
+                class="main-input"
+                autocomplete="off"
+              />
+              <button type="button" id="btnClearId" class="input-clear" style="display: none;">✕</button>
+            </div>
+
+            <!-- Live ID Status Banner -->
+            <div id="idStatusBadge" class="id-status-badge" style="display: none;"></div>
+
+            <!-- Recent ID Chips -->
+            <div id="recentChipsWrapper" class="chips-container" style="display: none;">
+              <span class="chips-title">ID ធ្លាប់ប្រើ៖</span>
+              <div id="recentChipsList" class="chips-scroll"></div>
+            </div>
+          </div>
+
+          <!-- Section 2: Amount Selection -->
+          <div class="form-section">
+            <div class="section-label-row">
+              <label class="section-label">
+                <svg viewBox="0 0 24 24" class="label-svg"><rect x="2" y="6" width="20" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6 12h.01M18 12h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <span>ជ្រើសរើសទឹកប្រាក់ (USD)</span>
+              </label>
+              <span class="rate-badge">1$ = 4,100៛</span>
+            </div>
+            
+            <!-- Amount Presets Grid -->
+            <div class="amount-chips-grid">
+              <button type="button" class="amt-chip" data-amount="3.00">
+                <span class="amt-usd">$3.00</span>
+                <span class="amt-khr">12,300៛</span>
+              </button>
+              <button type="button" class="amt-chip active" data-amount="5.00">
+                <span class="amt-usd">$5.00</span>
+                <span class="amt-khr">20,500៛</span>
+              </button>
+              <button type="button" class="amt-chip" data-amount="10.00">
+                <span class="amt-usd">$10.00</span>
+                <span class="amt-khr">41,000៛</span>
+              </button>
+              <button type="button" class="amt-chip" data-amount="20.00">
+                <span class="amt-usd">$20.00</span>
+                <span class="amt-khr">82,000៛</span>
+              </button>
+              <button type="button" class="amt-chip" data-amount="50.00">
+                <span class="amt-usd">$50.00</span>
+                <span class="amt-khr">205,000៛</span>
+              </button>
+              <button type="button" class="amt-chip" data-amount="100.00">
+                <span class="amt-usd">$100.00</span>
+                <span class="amt-khr">410,000៛</span>
+              </button>
+              <button type="button" class="amt-chip" data-amount="200.00">
+                <span class="amt-usd">$200.00</span>
+                <span class="amt-khr">820,000៛</span>
+              </button>
+            </div>
+
+            <!-- Custom Amount Input -->
+            <div class="custom-amt-wrap">
+              <span class="custom-currency">$</span>
+              <input
+                type="number"
+                id="inputCustomAmount"
+                step="0.01"
+                min="3"
+                max="10000"
+                placeholder="បញ្ចូលទឹកប្រាក់ផ្សេងទៀត (Min: $3 - Max: $10000)"
+                class="custom-amt-input"
+              />
+              <span class="custom-unit">USD</span>
+            </div>
+          </div>
+
+          <!-- Section 3: Bank Method -->
+          <div class="form-section">
+            <label class="section-label">
+              <svg viewBox="0 0 24 24" class="label-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m3 9 9-7 9 7v2H3V9zm2 4v6m4-6v6m6-6v6m4-6v6M2 21h20" /></svg>
+              <span>ជ្រើសរើសធនាគារទូទាត់</span>
+            </label>
+            
+            <div class="bank-selector-grid">
+              <!-- Bakong Real Logo from Soramitsu -->
+              <button type="button" class="bank-select-card active" data-bank="bakong">
+                <div class="bank-card-icon-wrap bakong">
+                  <img src="assets/bakong_icon.png" alt="Bakong App" class="bank-img-logo" />
+                </div>
+                <div class="bank-card-text">
+                  <div class="bank-title-row">
+                    <span class="bank-name">Bakong App</span>
+                    <span class="bank-tag-pill red">KHQR</span>
+                  </div>
+                  <span class="bank-hint">ស្កេនបានគ្រប់ធនាគារក្នុងស្រុកទាំងអស់</span>
+                </div>
+                <div class="bank-radio-circle">
+                  <svg viewBox="0 0 24 24" class="check-icon"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                </div>
+              </button>
+
+              <!-- ABA Real Logo from Gold Zone Media -->
+              <button type="button" class="bank-select-card" data-bank="aba">
+                <div class="bank-card-icon-wrap aba">
+                  <img src="assets/aba_icon.png" alt="ABA Bank" class="bank-img-logo" />
+                </div>
+                <div class="bank-card-text">
+                  <div class="bank-title-row">
+                    <span class="bank-name">ABA Bank</span>
+                    <span class="bank-tag-pill blue">PayWay</span>
+                  </div>
+                  <span class="bank-hint">ABA Mobile / ស្កេន KHQR</span>
+                </div>
+                <div class="bank-radio-circle">
+                  <svg viewBox="0 0 24 24" class="check-icon"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Notice -->
+          <div class="note-box">
+            <svg viewBox="0 0 24 24" class="note-svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><line x1="12" y1="16" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="8" x2="12.01" y2="8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <p>ប្រព័ន្ធនឹងបញ្ចូលទឹកប្រាក់ទៅកាន់ ID 1xBet ដោយស្វ័យប្រវត្តិក្នង 1-2 នាទីបន្ទាប់ពីស្កេនទូទាត់។</p>
+          </div>
+
+          <!-- Primary Submit CTA -->
+          <button type="button" id="btnSubmitTopUp" class="btn-primary-action" disabled>
+            <span id="btnTopUpLabel">សូមបញ្ចូលលេខ ID 1xBet យ៉ាងតិច 4 ខ្ទង់</span>
+          </button>
+
+        </div>
+
+        <!-- Voucher Display View (Shown after QR is generated) -->
+        <div id="topupVoucherView" class="clean-card" style="display: none;">
+          
+          <div class="voucher-top-bar">
+            <button type="button" id="btnBackFromVoucher" class="back-link-btn">
+              <svg viewBox="0 0 24 24" class="btn-inline-svg"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              <span>ត្រឡប់ក្រោយ</span>
+            </button>
+            <span class="voucher-status-live">
+              <span class="radar-dot"></span>
+              កំពុងរង់ចាំទូទាត់...
+            </span>
+          </div>
+
+          <!-- Authentic Cambodian KHQR Card (Official 273px Design) -->
+          <div class="khqr-card-wrapper">
+            <div id="voucherBankCard" class="khqr-official-card bakong">
+              
+              <!-- Card Top Header with Official KHQR SVG Logo -->
+              <div class="khqr-header-banner">
+                <svg class="khqr-official-svg" width="60" height="14" viewBox="0 0 60 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M39.006 5.19439V9.59764H34.5318C34.0729 9.59764 33.7288 9.2307 33.7288 8.80731V5.22264C33.7288 4.77103 34.1016 4.43231 34.5318 4.43231H38.1743C38.6619 4.40408 39.006 4.74278 39.006 5.19439Z" fill="white"/>
+                  <path d="M59.9717 6.97176H57.7345C57.7345 4.34676 55.5548 2.20159 52.8875 2.20159C50.7651 2.20159 48.9008 3.55645 48.2699 5.53225C48.1265 6.01209 48.0404 6.49192 48.0404 6.97176V13.9718H47.9831C46.7785 13.9718 45.8033 13.0121 45.8033 11.8266V6.97176H45.832C45.832 5.05241 46.6351 3.21773 48.0691 1.89112C49.3884 0.677406 51.1093 0 52.9162 0C56.8168 0 59.9717 3.13305 59.9717 6.97176Z" fill="white"/>
+                  <path d="M59.9999 13.9718L56.845 14L56.0706 13.2379L54.3497 11.5444L51.9692 9.20166H55.1241L59.9999 13.9718Z" fill="white"/>
+                  <path d="M39.7517 11.7702H33.0117C32.1799 11.7702 31.5203 11.121 31.5203 10.3024V3.66936C31.5203 2.85081 32.1799 2.20159 33.0117 2.20159H39.7517C40.5834 2.20159 41.2431 2.85081 41.2431 3.66936V10.3024L43.4802 12.504V2.14515C43.4802 0.959671 42.505 0 41.3005 0H31.4629C30.2583 0 29.2832 0.959671 29.2832 2.14515V11.8266C29.2832 13.0121 30.2583 13.9718 31.4629 13.9718H41.9888L39.7517 11.7702Z" fill="white"/>
+                  <path d="M12.3614 14H9.20656L2.60996 7.47984V14H0V0H2.60996V6.2379L8.94843 0H12.046L5.16255 6.71772L12.3614 14Z" fill="white"/>
+                  <path d="M24.1492 0H26.7018V14H24.1492V7.93145H16.8643V14H14.3117V0H16.8643V5.84273H24.1492V0Z" fill="white"/>
+                </svg>
+              </div>
+
+              <!-- Cutout Notch Triangle -->
+              <div class="khqr-notch-wrap">
+                <div class="khqr-triangle"></div>
+              </div>
+
+              <!-- Store Name & Amount with Dashed Divider -->
+              <div class="khqr-info-row">
+                <span id="voucherMerchantNameText" class="khqr-store-name">MAKO CAMBO</span>
+                <div class="khqr-amount-wrap">
+                  <span id="voucherAmountText" class="khqr-amount-num">$0.00</span>
+                  <span class="khqr-currency-code">USD</span>
+                </div>
+              </div>
+
+              <!-- QR Code Display Area with PayWay Watermark Logo -->
+              <div class="khqr-code-body">
+                <img src="https://checkout.payway.com.kh/images/usd-khqr-logo.svg" class="khqr-watermark-bg" alt="KHQR Logo" />
+                <div id="qrCodeContainer" class="khqr-qr-frame">
+                  <div id="qrCanvasBox"></div>
+                  <img id="qrDirectImg" src="" alt="KHQR" style="display:none; width: 194px; height: 194px;" />
+                  <div id="qrCenterLogo" class="qr-logo-badge">KHQR</div>
+                  <div id="qrExpiredView" class="qr-expired-curtain" style="display: none;">
+                    <svg viewBox="0 0 24 24" class="curtain-svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="12 6 12 12 16 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    <span class="curtain-text">កូដបានផុតកំណត់</span>
+                    <span class="curtain-sub">សូមបង្កើតកូដថ្មី</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Authentic Khmer Bank Scan Instruction -->
+            <p class="khqr-scan-guide">Scan with ABA Mobile, or other Mobile Banking App supporting KHQR</p>
+
+            <!-- Countdown Timer -->
+            <div class="khqr-meta-box">
+              <div class="timer-countdown-row">
+                <svg viewBox="0 0 24 24" class="timer-svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="12 6 12 12 16 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <span class="timer-label">រយៈពេលនៅសល់៖</span>
+                <span id="voucherTimerSec" class="timer-seconds">180s</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Voucher Action Buttons -->
+          <div class="voucher-actions-group">
+            <button type="button" id="btnOpenAbaApp" class="btn-aba-direct" style="display: none;">
+              <span class="btn-aba-icon-wrap">
+                <svg viewBox="0 0 24 24" class="btn-aba-svg" fill="currentColor">
+                  <path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                </svg>
+              </span>
+              <span class="btn-aba-text">បើកបង់ប្រាក់ក្នុង <b>ABA Mobile</b></span>
+              <svg viewBox="0 0 24 24" class="btn-aba-arrow" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+
+            <button type="button" id="btnRegenQr" class="btn-primary-action" style="display: none;">
+              <svg viewBox="0 0 24 24" class="btn-inline-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>បង្កើតកូដទូទាត់ថ្មី</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Success Receipt View -->
+        <div id="topupSuccessView" class="clean-card success-card" style="display: none;">
+          <div class="success-circle-svg">
+            <svg viewBox="0 0 24 24" class="success-svg-check"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h2 class="success-heading">ទូទាត់ប្រាក់ជោគជ័យ!</h2>
+          <p class="success-subheading">PAYMENT COMPLETED • ADD FUNDS</p>
+
+          <div class="receipt-details-list">
+            <div class="receipt-item">
+              <span class="r-label">ID 1xBet:</span>
+              <span id="recOneXBetId" class="r-val">--</span>
+            </div>
+            <div class="receipt-item">
+              <span class="r-label">ចំនួនទឹកប្រាក់:</span>
+              <span id="recAmount" class="r-val text-emerald font-bold">+$0.00 USD</span>
+            </div>
+            <div class="receipt-item">
+              <span class="r-label">លេខវិក្កយបត្រ:</span>
+              <span id="recTranId" class="r-val font-mono">--</span>
+            </div>
+            <div class="receipt-item">
+              <span class="r-label">ស្ថានភាព:</span>
+              <span class="r-val text-emerald">ទឹកប្រាក់កំពុងបញ្ចូល (Add Funds) ទៅកាន់គណនី 1xBet</span>
+            </div>
+          </div>
+
+          <button type="button" id="btnNewDeposit" class="btn-primary-action">
+            <span>ដាក់ប្រាក់ម្តងទៀត</span>
+          </button>
+        </div>
+
+      </section>
+
+      <!-- ================= TAB 2: ដកប្រាក់ (WITHDRAW) ================= -->
+      <section id="tabWithdraw" class="tab-view" style="display: none;">
+        
+        <div class="clean-card main-form-card" style="text-align: center; padding: 36px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;">
+          
+          <div style="width: 72px; height: 72px; border-radius: 50%; background: rgba(56, 189, 248, 0.12); border: 1.5px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center;">
+            <svg viewBox="0 0 24 24" style="width: 38px; height: 38px; color: #38bdf8;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </div>
+
+          <div style="font-size: 16px; font-weight: 700; line-height: 1.6; color: #f8fafc; max-width: 330px;">
+            សូមចុច Username នេះឆាតទៅ Admin ដើម្បីដកប្រាក់ ( <a href="https://t.me/ma_ko168" target="_blank" style="color: #38bdf8; text-decoration: underline; font-weight: 800;">@ma_ko168</a> )
+          </div>
+
+          <div style="font-size: 34px; line-height: 1; user-select: none;">
+            👇
+          </div>
+
+          <a href="https://t.me/ma_ko168" target="_blank" id="btnContactAdminWd" class="btn-primary-action" style="text-decoration: none; width: 100%; max-width: 320px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" class="btn-inline-svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path>
+            </svg>
+            <span>ឆាតទៅ Admin (@ma_ko168)</span>
+          </a>
+
+          <button type="button" id="btnWithdrawBackHome" class="back-link-btn" style="margin-top: 4px;">
+            <svg viewBox="0 0 24 24" class="btn-inline-svg"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            <span>ត្រឡប់ទៅទំព័រដើម</span>
+          </button>
+
+        </div>
+
+      </section>
+
+      <!-- ================= TAB 3: គណនី (PROFILE) ================= -->
+      <section id="tabProfile" class="tab-view" style="display: none;">
+        
+        <!-- User Info Card -->
+        <div class="clean-card profile-user-card">
+          <div class="user-row">
+            <div class="user-avatar-wrap">
+              <img id="userAvatarImg" src="" alt="Avatar" class="avatar-photo" style="display: none;" />
+              <div id="avatarFallbackLetter" class="avatar-letter">M</div>
+            </div>
+
+            <div class="user-info-text">
+              <div class="user-title-row">
+                <h3 id="profileNameText" class="user-name">MAKO Member</h3>
+                <span class="badge-vip">VIP</span>
+              </div>
+              <span id="profileUsernameText" class="user-handle">@member</span>
+              <div class="user-id-row">
+                <span>ID: <b id="profileIdNum">6810457857</b></span>
+                <button type="button" id="btnCopyProfileId" class="copy-chip-btn" title="Copy ID">
+                  <svg viewBox="0 0 24 24" class="btn-inline-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <button type="button" id="btnRefreshBalance" class="refresh-circle-btn" title="Reload">
+              <svg viewBox="0 0 24 24" class="refresh-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+          </div>
+
+          <!-- Balance Showcase -->
+          <div class="balance-box">
+            <span class="balance-label">សមតុល្យបច្ចុប្បន្ន (Balance)</span>
+            <div class="balance-large-row">
+              <span id="profileBigBalance" class="big-balance-num">$0.00</span>
+              <span class="balance-currency">USD</span>
+            </div>
+
+            <div class="quick-profile-actions">
+              <button type="button" id="btnProfileGoTopUp" class="action-pill deposit">
+                <svg viewBox="0 0 24 24" class="btn-inline-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M19 12l-7 7-7-7"/></svg>
+                <span>ដាក់ប្រាក់</span>
+              </button>
+              <button type="button" id="btnProfileGoWithdraw" class="action-pill withdraw">
+                <svg viewBox="0 0 24 24" class="btn-inline-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5M5 12l7-7 7 7"/></svg>
+                <span>ដកប្រាក់</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Orders History -->
+        <div class="clean-card">
+          <div class="view-header">
+            <h3 class="view-title">ប្រវត្តិប្រតិបត្តិការ (Order History)</h3>
+            <span id="orderHistoryCount" class="badge-tag">0</span>
+          </div>
+
+          <div id="orderHistoryList" class="orders-container">
+            <div class="empty-history">
+              <svg viewBox="0 0 24 24" class="empty-svg"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <p>មិនទាន់មានប្រវត្តិប្រតិបត្តិការនៅឡើយទេ</p>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================= TAB 4: ជំនួយ (GUIDE) ================= -->
+      <section id="tabGuide" class="tab-view" style="display: none;">
+        
+        <div class="clean-card">
+          <div class="view-header">
+            <h2 class="view-title">ជំនួយ និងការណែនាំ (Help)</h2>
+          </div>
+
+          <div class="guide-segmented-bar">
+            <button type="button" class="guide-toggle-btn active" data-guide="topup">ដាក់ប្រាក់</button>
+            <button type="button" class="guide-toggle-btn" data-guide="withdraw">ដកប្រាក់</button>
+          </div>
+
+          <!-- Top-Up Guide -->
+          <div id="guideTopUpBlock" class="guide-text-block">
+            <div class="guide-step">
+              <span class="step-num">1</span>
+              <div>
+                <b>បញ្ចូល ID 1xBet:</b>
+                <p>វាយបញ្ចូលលេខសម្គាល់គណនីរបស់អ្នកក្នុង Tab ដាក់ប្រាក់។</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <span class="step-num">2</span>
+              <div>
+                <b>ជ្រើសរើសទឹកប្រាក់ & ធនាគារ:</b>
+                <p>រើសចំនួនទឹកប្រាក់ USD និងធនាគារ Bakong ឬ ABA។</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <span class="step-num">3</span>
+              <div>
+                <b>ស្កេនទូទាត់:</b>
+                <p>ស្កេនកូដ KHQR ➔ ប្រព័ន្ធនឹង Add Funds ជូនអ្នកក្នុង 1-2 នាទី!</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Withdraw Guide -->
+          <div id="guideWithdrawBlock" class="guide-text-block" style="display: none;">
+            <div class="guide-step">
+              <span class="step-num">1</span>
+              <div>
+                <b>ទំនាក់ទំនង Admin ដើម្បីដកប្រាក់:</b>
+                <p>សូមចុច Username នេះឆាតទៅ Admin ដើម្បីដកប្រាក់ ( <a href="https://t.me/ma_ko168" target="_blank" style="color: #38bdf8; text-decoration: underline; font-weight: 700;">@ma_ko168</a> )</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar (Docked cleanly at bottom) -->
+    <nav class="bottom-nav">
+      <div class="nav-container">
+        <button type="button" class="nav-item active" data-tab="topup">
+          <svg viewBox="0 0 24 24" class="nav-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M19 12l-7 7-7-7"/></svg>
+          <span class="nav-label">ដាក់ប្រាក់</span>
+        </button>
+
+        <button type="button" class="nav-item" data-tab="withdraw">
+          <svg viewBox="0 0 24 24" class="nav-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 19V5M5 12l7-7 7 7"/></svg>
+          <span class="nav-label">ដកប្រាក់</span>
+        </button>
+
+        <button type="button" class="nav-item" data-tab="profile">
+          <svg viewBox="0 0 24 24" class="nav-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="nav-label">គណនី</span>
+        </button>
+
+        <button type="button" class="nav-item" data-tab="guide">
+          <svg viewBox="0 0 24 24" class="nav-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span class="nav-label">ជំនួយ</span>
+        </button>
+      </div>
+    </nav>
+
+  </div>
+
+  <!-- Local Standalone Vendor Libraries -->
+  <script src="vendor/qrcode.min.js"></script>
+  <script src="vendor/confetti.browser.js"></script>
+
+  <!-- Application Logic (Cache-busted) -->
+  <script src="app.js?v=2.4.0"></script>
+</body>
+</html>
