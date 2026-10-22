@@ -962,24 +962,29 @@ async function processSuccessfulTopup(tranId) {
     ]
   };
 
+  let sentSuccess = null;
   const targetChatId = tx.chatId || tx.userId;
   if (targetChatId) {
     if (tx.msgId) {
       // Bot flow: delete QR code photo so user cannot scan again
       await bot.telegram.deleteMessage(targetChatId, tx.msgId).catch(() => {});
     }
-    const sentSuccess = await bot.telegram.sendMessage(targetChatId, successCaption, {
-      parse_mode: 'HTML',
-      reply_markup: successMarkup
-    }).catch(() => {});
+    try {
+      sentSuccess = await bot.telegram.sendMessage(targetChatId, successCaption, {
+        parse_mode: 'HTML',
+        reply_markup: successMarkup
+      });
 
-    if (sentSuccess?.message_id) {
-      userActiveMsgs.set(targetChatId, sentSuccess.message_id);
-      const r = topupRequests.get(tranId);
-      if (r) {
-        r.userWaitMsgId = sentSuccess.message_id;
-        saveTopupRequestsToDisk();
+      if (sentSuccess?.message_id) {
+        userActiveMsgs.set(targetChatId, sentSuccess.message_id);
+        const r = topupRequests.get(tranId);
+        if (r) {
+          r.userWaitMsgId = sentSuccess.message_id;
+          saveTopupRequestsToDisk();
+        }
       }
+    } catch (sendErr) {
+      console.warn(`[Topup Notification] Could not send confirmation to user ${targetChatId}: ${sendErr.message}`);
     }
   }
 
@@ -1026,10 +1031,17 @@ async function processSuccessfulTopup(tranId) {
   };
 
   if (ADMIN_TOPUP_GROUP_ID) {
-    bot.telegram.sendMessage(ADMIN_TOPUP_GROUP_ID, adminTopupText, {
-      parse_mode: 'HTML',
-      reply_markup: adminTopupMarkup
-    }).catch(err => console.error(`❌ Failed to send top-up to admin group (${ADMIN_TOPUP_GROUP_ID}):`, err.message));
+    try {
+      await bot.telegram.sendMessage(ADMIN_TOPUP_GROUP_ID, adminTopupText, {
+        parse_mode: 'HTML',
+        reply_markup: adminTopupMarkup
+      });
+      console.log(`✅ [TopUp Alert] Successfully alerted Admin Top-Up Group (${ADMIN_TOPUP_GROUP_ID}) for tranId: ${tx.tranId}, Amount: $${tx.usdAmount}`);
+    } catch (err) {
+      console.error(`❌ Failed to send top-up to admin group (${ADMIN_TOPUP_GROUP_ID}):`, err.message);
+    }
+  } else {
+    console.warn('⚠️ [TopUp Alert] ADMIN_TOPUP_GROUP_ID is not configured!');
   }
 
   return { success: true, tx };
@@ -2151,13 +2163,16 @@ function showUsdAmountScreen(ctx, oneXBetId, playerName = null) {
   const reply_markup = {
     inline_keyboard: [
       [
+        { text: '🧪 $0.02 (Test)', callback_data: `sel_bank_0.02_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
         { text: '$3.00', callback_data: `sel_bank_3_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
-        { text: '$5.00', callback_data: `sel_bank_5_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
-        { text: '$10.00', callback_data: `sel_bank_10_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' }
+        { text: '$5.00', callback_data: `sel_bank_5_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' }
       ],
       [
+        { text: '$10.00', callback_data: `sel_bank_10_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
         { text: '$20.00', callback_data: `sel_bank_20_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
-        { text: '$50.00', callback_data: `sel_bank_50_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
+        { text: '$50.00', callback_data: `sel_bank_50_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' }
+      ],
+      [
         { text: '$100.00', callback_data: `sel_bank_100_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' }
       ],
       [
@@ -2207,8 +2222,8 @@ bot.action(/topup_custom_USD_(.+)/, async (ctx) => {
     `━━━━━━━━━━━━━━━\n` +
     `${ANIM.ONEXBET} <b>ID 1xBet:</b> <code>${oneXBetId}</code>\n` +
     `${ANIM.SPARKLES} <i>សូមបញ្ចូលទឹកប្រាក់ក្នុងប្រអប់សារ:</i>\n\n` +
-    `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>3</code> , <code>3.01</code> , <code>3.33</code> ,\n` +
-    `<i>(Min: $3 - Max: $10000)</i>\n` +
+    `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>0.02</code> , <code>3</code> , <code>3.50</code> ,\n` +
+    `<i>(Min: $0.02 - Max: $10000)</i>\n` +
     `━━━━━━━━━━━━━━━`;
 
   const reply_markup = {
@@ -2602,54 +2617,9 @@ bot.action(/verify_pay_(.+)/, async (ctx) => {
     const result = await checkPaymentStatus(tx.tranId, tx.md5);
 
     if (result.status === 'PAID' || result.paid === true || result.status === 'SUCCESS') {
-      if (tx.pollInterval) clearInterval(tx.pollInterval);
-      clearTimeout(tx.timerId);
-      pendingTxs.delete(tranId);
-
-      const creditedAmount = tx.usdAmount !== undefined ? tx.usdAmount : tx.amount;
-      const user = getUser(tx.userId, ctx.from.first_name);
-      user.balance += creditedAmount;
-      user.orders.push({
-        item: `បញ្ចូលលុយ KHQR ($${creditedAmount.toFixed(2)})`,
-        price: creditedAmount,
-        date: new Date().toLocaleDateString('km-KH')
-      });
-
-      const paidAmtText = `+$${creditedAmount.toFixed(2)} USD`;
-
-      const successCaption =
-        `${ANIM.PARTY} <b>ការទូទាត់ប្រាក់ជោគជ័យ (PAID SUCCESSFUL)</b>
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-${ANIM.CHECK} <b>ទឹកប្រាក់បានបញ្ចូល:</b> <code>${paidAmtText}</code>
-${ANIM.MONEY} <b>សមតុល្យបច្ចុប្បន្ន:</b> <code>$${user.balance.toFixed(2)} USD</code>
-${ANIM.ID} <b>លេខវិក្កយបត្រ:</b> <code>${tx.tranId}</code>
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-${ANIM.SPARKLES} <i>ទឹកប្រាក់ត្រូវបានបញ្ចូលទៅក្នុងគណនីរបស់អ្នករួចរាល់ហើយ!</i>`;
-
-      const reply_markup = {
-        inline_keyboard: [
-          [
-            {
-              text: 'ទៅកាន់ Menu ចម្បង',
-              callback_data: 'back_main',
-              icon_custom_emoji_id: BTN_ICONS.DIAMOND,
-              style: 'primary'
-            }
-          ]
-        ]
-      };
-
-      try {
-        await ctx.telegram.deleteMessage(tx.chatId, tx.msgId).catch(() => { });
-        const sentSuccess = await ctx.telegram.sendMessage(tx.chatId, successCaption, {
-          parse_mode: 'HTML',
-          reply_markup
-        });
-        if (sentSuccess?.message_id) {
-          userActiveMsgs.set(tx.chatId, sentSuccess.message_id);
-        }
-      } catch (e) { }
-
+      await processSuccessfulTopup(tranId);
+      await ctx.answerCbQuery('✅ ការទូទាត់ប្រាក់ជោគជ័យ!').catch(() => { });
+      return;
     } else {
       const remainingSec = Math.max(0, Math.round((tx.expiresAt - Date.now()) / 1000));
       await ctx.answerCbQuery(
@@ -3362,13 +3332,13 @@ ${ANIM.BULB} <b>សូមចំណាំ៖</b>
     const usdAmount = Math.round(parseFloat(rawInput) * 100) / 100;
     const oneXBetId = userState?.oneXBetId || 'N/A';
 
-    if (isNaN(usdAmount) || usdAmount < 3 || usdAmount > 10000) {
+    if (isNaN(usdAmount) || usdAmount < 0.02 || usdAmount > 10000) {
       const errText =
         `${ANIM.WARN} <b>ចំនួនទឹកប្រាក់មិនត្រឹមត្រូវទេ!</b>\n` +
         `━━━━━━━━━━━━━━━\n` +
         `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${oneXBetId}</code>\n` +
-        `${ANIM.CROSS} <b>សូមបញ្ចូលទឹកប្រាក់ (Min: $3 - Max: $10000)!</b>\n` +
-        `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>3</code> , <code>3.01</code> , <code>3.33</code> ,\n` +
+        `${ANIM.CROSS} <b>សូមបញ្ចូលទឹកប្រាក់ (Min: $0.02 - Max: $10000)!</b>\n` +
+        `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>0.02</code> , <code>3</code> , <code>3.50</code> ,\n` +
         `━━━━━━━━━━━━━━━`;
       const reply_markup = {
         inline_keyboard: [
@@ -3695,8 +3665,8 @@ const server = http.createServer(async (req, res) => {
       const username = body.username || 'User';
       const name = body.name || 'Member';
 
-      if (isNaN(amount) || amount < 3 || amount > 10000) {
-        return sendJson(res, 400, { success: false, error: 'ចំនួនទឹកប្រាក់ត្រូវតែចាប់ពី $3.00 ឡើងទៅ (អតិបរមា: $10,000)' });
+      if (isNaN(amount) || amount < 0.02 || amount > 10000) {
+        return sendJson(res, 400, { success: false, error: 'ចំនួនទឹកប្រាក់ត្រូវតែចាប់ពី $0.02 ឡើងទៅ (អតិបរមា: $10,000)' });
       }
 
       const data = await generateKHQR(amount, 'USD', bank);

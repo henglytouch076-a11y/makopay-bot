@@ -335,7 +335,7 @@
   function updateSubmitButtonState() {
     const amt = getEffectiveAmount();
     const idValid = state.oneXBetId.length >= 6 && isIdValidInApp !== false;
-    const amtValid = amt >= 3 && amt <= 10000;
+    const amtValid = amt >= 0.02 && amt <= 10000;
 
     if (idValid && amtValid) {
       els.btnSubmitTopUp.removeAttribute('disabled');
@@ -349,7 +349,7 @@
       } else if (!idValid) {
         els.btnTopUpLabel.textContent = 'សូមបញ្ចូលលេខ ID 1xBet ត្រឹមត្រូវ (6-11 ខ្ទង់)';
       } else {
-        els.btnTopUpLabel.textContent = 'សូមជ្រើសរើសទឹកប្រាក់ (យ៉ាងតិច $3.00)';
+        els.btnTopUpLabel.textContent = 'សូមជ្រើសរើសទឹកប្រាក់ (យ៉ាងតិច $0.02)';
       }
     }
   }
@@ -415,8 +415,8 @@
       return;
     }
 
-    if (isNaN(finalAmount) || finalAmount < 3 || finalAmount > 10000) {
-      alert('សូមជ្រើសរើស ឬបញ្ចូលទឹកប្រាក់ចាប់ពី $3 ដល់ $10000 USD!');
+    if (isNaN(finalAmount) || finalAmount < 0.02 || finalAmount > 10000) {
+      alert('សូមជ្រើសរើស ឬបញ្ចូលទឹកប្រាក់ចាប់ពី $0.02 ដល់ $10000 USD!');
       return;
     }
 

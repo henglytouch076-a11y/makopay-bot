@@ -711,6 +711,15 @@ body::before {
   color: #bae6fd;
 }
 
+.amt-chip.test-chip {
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.amt-chip.test-chip .amt-khr {
+  color: #f59e0b;
+  font-weight: 800;
+}
+
 /* Custom Amount Input Wrap */
 .custom-amt-wrap {
   position: relative;
