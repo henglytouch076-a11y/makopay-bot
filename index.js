@@ -1408,7 +1408,18 @@ async function checkAbaPaymentStatus(token, clientId, stateRequestTime, deviceId
 
 async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
   const isAba = String(bank).toLowerCase() === 'aba';
-  const endpoint = isAba ? 'aba' : 'bakong';
+
+  if (isAba) {
+    try {
+      const abaResult = await generateAbaPaywayPayment(amount, currency);
+      return abaResult;
+    } catch (abaErr) {
+      console.error('⚠️ ABA PayWay generation error:', abaErr.message);
+      throw new Error(`ABA QR Generation Error: ${abaErr.message}`);
+    }
+  }
+
+  const endpoint = String(bank).toLowerCase() === 'bakong' ? 'bakong' : 'aba';
   const url = `${PAYLINK_BASE_URL}/api/${endpoint}/generate-qr`;
   const response = await fetch(url, {
     method: 'POST',
@@ -1426,25 +1437,31 @@ async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
   }
 
   const data = await response.json();
-  if (isAba) {
-    data.bank = 'ABA';
-    data.merchantName = ADMIN_ABA_NAME || 'MAKO by H.T';
-    if (!data.deepLink && data.qrString) {
-      data.deepLink = `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}`;
-    }
-    if (!data.androidIntent && data.qrString) {
-      data.androidIntent = `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end`;
-    }
-  } else {
-    data.bank = 'BAKONG';
-  }
+  data.bank = 'BAKONG';
   return data;
 }
 
 async function checkPaymentStatus(tranId, md5, tx = null) {
   const transaction = tx || pendingTxs.get(tranId);
-  const targetMd5 = md5 || transaction?.md5;
+  if (transaction && transaction.bank === 'aba' && transaction.token && transaction.clientId) {
+    try {
+      const abaRes = await checkAbaPaymentStatus(
+        transaction.token,
+        transaction.clientId,
+        transaction.stateRequestTime,
+        transaction.deviceId
+      );
+      if (abaRes.paid || abaRes.status === 'PAID') {
+        return { success: true, paid: true, status: 'PAID' };
+      }
+      return { success: true, paid: false, status: 'PENDING' };
+    } catch (err) {
+      console.warn('ABA status check error:', err.message);
+      return { success: true, paid: false, status: 'PENDING' };
+    }
+  }
 
+  const targetMd5 = md5 || transaction?.md5;
   const url = `${PAYLINK_BASE_URL}/api/web/check-payment`;
   const response = await fetch(url, {
     method: 'POST',
@@ -2355,6 +2372,11 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
       ? `${ANIM.ABA} <b>ABA : ${ADMIN_ABA_NAME}</b>`
       : `${ANIM.BAKONG} <b>Bakong : ${ADMIN_BAKONG_NAME}</b>`;
 
+    const liveBaseUrl = (process.env.MINIAPP_URL && !process.env.MINIAPP_URL.includes('trycloudflare') && !process.env.MINIAPP_URL.includes('localhost'))
+      ? process.env.MINIAPP_URL
+      : 'https://makopay-bot.onrender.com';
+    const payAbaUrl = `${liveBaseUrl}/pay-aba?tranId=${encodeURIComponent(tranId)}&amount=${encodeURIComponent(data.amountFormatted || finalUsdAmount.toFixed(2))}&qr=${encodeURIComponent(data.qrString)}`;
+
     const caption =
       `${ANIM.MONEY} <b>វិក្កយបត្របង់ប្រាក់ ${bankHeader}</b>\n` +
       `━━━━━━━━━━━━━━━\n` +
@@ -2366,14 +2388,12 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
       `${ANIM.ID} <b>លេខវិក្កយបត្រ:</b> <code>${tranId}</code>\n` +
       `${ANIM.HOURGLASS} <b>សុពលភាព:</b> <code>3 នាទី</code>\n` +
       `━━━━━━━━━━━━━━━\n` +
-      (isAba && computedDeepLink ? `📲 <a href="${computedDeepLink}">👉 <b>ចុចទីនេះដើម្បីបើក ABA Mobile ផ្ទាល់</b></a>\n━━━━━━━━━━━━━━━\n` : '') +
+      (isAba ? `📲 <a href="${payAbaUrl}">👉 <b>ចុចទីនេះដើម្បីបើក ABA Mobile ផ្ទាល់</b></a>\n━━━━━━━━━━━━━━━\n` : '') +
       `${ANIM.PHONE} <i>${scanInstruction}</i>\n` +
       `${ANIM.REFRESH} <i>ប្រព័ន្ធត្រួតពិនិត្យស្វ័យប្រវត្តិ (Auto 24/7)...</i>`;
 
     const buttons = [];
     if (isAba) {
-      const baseUrl = activeMiniappUrl || 'http://localhost:3000';
-      const payAbaUrl = `${baseUrl}/pay-aba?tranId=${encodeURIComponent(tranId)}&amount=${encodeURIComponent(data.amountFormatted || finalUsdAmount.toFixed(2))}&qr=${encodeURIComponent(data.qrString)}`;
       buttons.push([
         {
           text: 'បើកបង់ប្រាក់ក្នុង ABA Mobile',
