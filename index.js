@@ -999,18 +999,18 @@ async function processSuccessfulTopup(tranId) {
     : '';
 
   const adminTopupText =
-    `💳 <b>MAKO CAMBO BOT</b>${hiddenWaitLink}\n` +
-    `✅ <b>បានបញ្ចូលទឹកប្រាក់ជោគជ័យ</b>\n\n` +
+    `${ANIM.CARD} <b>MAKO CAMBO BOT</b>${hiddenWaitLink}\n` +
+    `${ANIM.SUCCESS} <b>បានបញ្ចូលទឹកប្រាក់ជោគជ័យ</b>\n\n` +
     `${getAdminBankLine(tx.bank)}\n` +
-    `💎 <b>ID 1xBet:</b> <code>${tx.oneXBetId}</code>\n` +
-    `💵 <b>ចំនួនទឹកប្រាក់:</b> <b>+$${tx.usdAmount.toFixed(2)} USD</b>\n` +
+    `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${tx.oneXBetId}</code>\n` +
+    `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${tx.usdAmount.toFixed(2)} USD</b>\n` +
     `━━━━━━━━━━━━━━━━━\n` +
-    `👑 <b>អតិថិជន:</b> <a href="tg://user?id=${tx.userId}">${user.name || 'User'}</a>${userHandle}\n` +
-    `ℹ️ <b>Telegram ID:</b> <code>${tx.userId}</code>\n` +
-    `🧾 <b>លេខវិក្កយបត្រ:</b> <code>${tx.tranId}</code>\n` +
-    `🗓 <b>កាលបរិច្ឆេទ:</b> <code>${new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</code>\n` +
+    `${ANIM.CROWN} <b>អតិថិជន:</b> <a href="tg://user?id=${tx.userId}">${user.name || 'User'}</a>${userHandle}\n` +
+    `${ANIM.ID} <b>Telegram ID:</b> <code>${tx.userId}</code>\n` +
+    `${ANIM.RECEIPT} <b>លេខវិក្កយបត្រ:</b> <code>${tx.tranId}</code>\n` +
+    `${ANIM.CALENDAR} <b>កាលបរិច្ឆេទ:</b> <code>${new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</code>\n` +
     `━━━━━━━━━━━━━━━━━\n` +
-    `📌 <i>សូម Admin បញ្ចូលប្រាក់ទៅ 1xBet រួចចុចប៊ូតុង:</i>`;
+    `${ANIM.PIN} <i>សូម Admin បញ្ចូលប្រាក់ទៅ 1xBet រួចចុចប៊ូតុង:</i>`;
 
   const adminTopupMarkup = {
     inline_keyboard: [
@@ -2680,17 +2680,17 @@ bot.action(/adm_td_(.+)/, async (ctx) => {
     : '';
 
   const doneAdminText =
-    `💳 <b>MAKO CAMBO BOT</b>\n` +
-    `✅ <b>បានបញ្ចូលទឹកប្រាក់ជោគជ័យ</b>\n\n` +
+    `${ANIM.CARD} <b>MAKO CAMBO BOT</b>\n` +
+    `${ANIM.SUCCESS} <b>បានបញ្ចូលទឹកប្រាក់ជោគជ័យ</b>\n\n` +
     `${getAdminBankLine(req.bank)}\n` +
-    `💎 <b>ID 1xBet:</b> <code>${req.oneXBetId}</code>\n` +
-    `💵 <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(req.amount).toFixed(2)} USD</b>\n` +
-    `━━━━━━━━━━━━━━━━━\n` +
-    `👑 <b>អតិថិជន:</b> ${req.name}${userHandle}\n` +
-    `ℹ️ <b>Telegram ID:</b> <code>${req.userId}</code>\n` +
-    `🪙 <b>បញ្ចូលដោយ Admin:</b> <b>${adminName}</b>\n` +
-    `🧾 <b>លេខវិក្កយបត្រ:</b> <code>${tranId}</code>\n` +
-    `🗓 <b>កាលបរិច្ឆេទ:</b> <code>${req.date || new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</code>`;
+    `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${req.oneXBetId}</code>\n` +
+    `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(req.amount).toFixed(2)} USD</b>\n` +
+    `━━━━━━━━━━━━━━━\n` +
+    `${ANIM.CROWN} <b>អតិថិជន:</b> ${req.name}${userHandle}\n` +
+    `${ANIM.SHIELD} <b>Telegram ID:</b> <code>${req.userId}</code>\n` +
+    `${ANIM.OFFICER} <b>បញ្ចូលដោយ Admin:</b> <b>${adminName}</b>\n` +
+    `${ANIM.RECEIPT} <b>លេខវិក្កយបត្រ:</b> <code>${tranId}</code>\n` +
+    `<b>កាលបរិច្ឆេទ:</b> <code>${req.date || new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</code>`;
 
   await ctx.editMessageText(doneAdminText, {
     parse_mode: 'HTML',
