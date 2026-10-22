@@ -1004,13 +1004,11 @@ async function processSuccessfulTopup(tranId) {
     `${getAdminBankLine(tx.bank)}\n` +
     `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${tx.oneXBetId}</code>\n` +
     `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${tx.usdAmount.toFixed(2)} USD</b>\n` +
-    `━━━━━━━━━━━━━━━━━\n` +
+    `━━━━━━━━━━━━━━━\n` +
     `${ANIM.CROWN} <b>អតិថិជន:</b> <a href="tg://user?id=${tx.userId}">${user.name || 'User'}</a>${userHandle}\n` +
-    `${ANIM.ID} <b>Telegram ID:</b> <code>${tx.userId}</code>\n` +
+    `${ANIM.SHIELD} <b>Telegram ID:</b> <code>${tx.userId}</code>\n` +
     `${ANIM.RECEIPT} <b>លេខវិក្កយបត្រ:</b> <code>${tx.tranId}</code>\n` +
-    `${ANIM.CALENDAR} <b>កាលបរិច្ឆេទ:</b> <code>${new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</code>\n` +
-    `━━━━━━━━━━━━━━━━━\n` +
-    `${ANIM.PIN} <i>សូម Admin បញ្ចូលប្រាក់ទៅ 1xBet រួចចុចប៊ូតុង:</i>`;
+    `<b>កាលបរិច្ឆេទ:</b> <code>${new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</code>`;
 
   const adminTopupMarkup = {
     inline_keyboard: [
