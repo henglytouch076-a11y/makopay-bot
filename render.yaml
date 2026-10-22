@@ -5,3 +5,52 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: CHANNEL_ID
+        value: "-1002180018274"
+      - key: CHANNEL_USERNAME
+        value: "@MakoVIPgroup"
+      - key: CHANNEL_LINK
+        value: "https://t.me/MakoVIPgroup"
+      - key: SUPPORT_USERNAME
+        value: "@ma_ko168"
+      - key: SUPPORT_LINK
+        value: "https://t.me/ma_ko168"
+      - key: PAYLINK_BASE_URL
+        value: "https://paylinkapi-bot.onrender.com"
+      - key: PAYLINK_API_KEY
+        sync: false
+      - key: PAYLINK_SECRET
+        sync: false
+      - key: BAKONG_ACCOUNT
+        value: "hengly_touch@bkrt"
+      - key: ABA_PAYWAY_URL
+        value: "https://link.payway.com.kh/a3550666t"
+      - key: STORE_NAME
+        value: "MAKO CAMBO"
+      - key: ADMIN_GROUP_ID
+        value: "-1003960463291"
+      - key: ADMIN_TOPUP_GROUP_ID
+        value: "-1003960463291"
+      - key: ADMIN_WITHDRAW_GROUP_ID
+        value: "-1003907785147"
+      - key: ADMIN_NAME
+        value: "hengly"
+      - key: ADMIN_USERNAME
+        value: "@ma_ko168"
+      - key: ADMIN_CHAT_ID
+        value: "6810457857"
+      - key: MOBCASH_APP_URL
+        value: "https://tinyurl.com/mobcashnew"
+      - key: MOBCASH_CASHIER_KEY
+        sync: false
+      - key: MOBCASH_DOH_DOMAIN
+        value: "mob-kassa.bet-1x.com"
+      - key: ADMIN_BANK_NAME
+        value: "MAKO H.T"
+      - key: ADMIN_ABA_NAME
+        value: "MAKO H.T"
+      - key: ADMIN_BAKONG_NAME
+        value: "MAKO CAMBO"
