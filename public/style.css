@@ -1090,6 +1090,16 @@ body::before {
   border-top-right-radius: 21px;
 }
 
+.khqr-header-title {
+  color: #ffffff;
+  font-family: var(--font-english), -apple-system, sans-serif;
+  font-weight: 900;
+  font-size: 14.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
 .khqr-official-svg {
   width: 60px;
   height: 14px;

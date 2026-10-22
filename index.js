@@ -1220,9 +1220,193 @@ async function showScreen(ctx, { text, reply_markup, photo = null, video = null,
   return sent;
 }
 
-// ---------------- PAYLINKAPI PAYMENT FUNCTIONS ----------------
+// ---------------- DIRECT ABA PAYWAY & BAKONG PAYMENT FUNCTIONS ----------------
+
+function sha512Hex(str) {
+  return crypto.createHash('sha512').update(str, 'utf8').digest('hex');
+}
+
+function hmacSha512Hex(str, key) {
+  return crypto.createHmac('sha512', key).update(str, 'utf8').digest('hex');
+}
+
+function generatePaywayDeviceId(length = 10) {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+async function generateAbaPaywayPayment(amount, currency = 'USD') {
+  const finalAmount = parseFloat(amount).toFixed(2);
+  const paywayUrl = (process.env.ABA_PAYWAY_URL || 'https://link.payway.com.kh/a3550666t').trim();
+
+  const resp = await fetch(paywayUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    }
+  });
+
+  if (!resp.ok) {
+    throw new Error(`ABA PayWay link returned HTTP ${resp.status}`);
+  }
+
+  const html = await resp.text();
+  const m = html.match(/<script(?![^>]*src)[^>]*>(window\.__NUXT__[\s\S]*?)<\/script>/);
+  if (!m) {
+    throw new Error('Could not parse PayWay NUXT state from merchant link');
+  }
+
+  const vm = require('node:vm');
+  const sandbox = { window: {} };
+  vm.createContext(sandbox);
+  vm.runInContext(m[1], sandbox);
+
+  const initialData = sandbox.window.__NUXT__;
+  const paymentLinkData = initialData?.data?.[0]?.data;
+  const initialAbaData = paymentLinkData?.aba_data;
+  const stateRequestTime = initialData?.state?.request_time;
+
+  if (!initialAbaData || !stateRequestTime) {
+    throw new Error('Missing initial PayWay session data');
+  }
+
+  const merchantName = paymentLinkData?.transaction_summary?.merchant?.company || ADMIN_ABA_NAME || 'MAKO by H.T';
+
+  // Step 1: list-payment-options
+  const additionalFields = JSON.stringify({ amount: String(finalAmount) });
+  const hash1 = sha512Hex(stateRequestTime + initialAbaData + additionalFields);
+
+  const res1 = await fetch('https://link.payway.com.kh/api/pw-app/v1/payment/gateway/list-payment-options', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Language': 'en',
+      'Origin': 'https://link.payway.com.kh',
+      'Referer': paywayUrl,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    },
+    body: JSON.stringify({
+      additional_fields: additionalFields,
+      request_time: stateRequestTime,
+      aba_data: initialAbaData,
+      hash: hash1
+    })
+  });
+
+  const data1 = await res1.json();
+  if (!data1.token) {
+    throw new Error(`PayWay list-payment-options error: ${JSON.stringify(data1.status || data1)}`);
+  }
+
+  // Step 2: request qr
+  const hash2 = hmacSha512Hex(stateRequestTime + data1.aba_data, data1.token);
+  const res2 = await fetch('https://link.payway.com.kh/api/pw-app/v1/payment/gateway/abapay-khqr/request-qr', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Language': 'en',
+      'Origin': 'https://link.payway.com.kh',
+      'Referer': paywayUrl,
+      'token': data1.token,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    },
+    body: JSON.stringify({
+      request_time: stateRequestTime,
+      aba_data: data1.aba_data,
+      hash: hash2
+    })
+  });
+
+  const data2 = await res2.json();
+  if (!data2.qr_string) {
+    throw new Error(`PayWay request-qr error: ${JSON.stringify(data2.status || data2)}`);
+  }
+
+  const tranId = data2.status?.tran_id || `ABA-${Date.now()}`;
+  const qrString = data2.qr_string;
+  const clientId = data2.client_id || data1.client_id;
+  const token = data2.token || data1.token;
+  const deviceId = generatePaywayDeviceId(10);
+  const deepLink = `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(qrString)}`;
+  const androidIntent = `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end`;
+
+  return {
+    success: true,
+    bank: 'ABA',
+    merchantName,
+    amount: parseFloat(finalAmount),
+    amountFormatted: finalAmount,
+    currency,
+    tranId,
+    transactionId: tranId,
+    billNumber: tranId,
+    qrString,
+    deepLink,
+    androidIntent,
+    token,
+    clientId,
+    deviceId,
+    stateRequestTime,
+    paywayUrl
+  };
+}
+
+async function checkAbaPaymentStatus(token, clientId, stateRequestTime, deviceId) {
+  const devId = deviceId || '1234567890';
+  const hash = sha512Hex(clientId + devId + stateRequestTime);
+  const paywayUrl = (process.env.ABA_PAYWAY_URL || 'https://link.payway.com.kh/a3550666t').trim();
+
+  const resp = await fetch('https://link.payway.com.kh/api/pw-app/v1/payment-link/check-payment-status', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Language': 'en',
+      'token': token,
+      'Origin': 'https://link.payway.com.kh',
+      'Referer': paywayUrl,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    },
+    body: JSON.stringify({
+      request_time: stateRequestTime,
+      client_id: clientId,
+      device_id: devId,
+      hash
+    })
+  });
+
+  if (!resp.ok) {
+    return { success: false, paid: false, status: 'PENDING' };
+  }
+
+  const json = await resp.json();
+  const action = (json?.data?.action || '').toLowerCase();
+  const isPaid = action === 'approved';
+
+  return {
+    success: true,
+    paid: isPaid,
+    status: isPaid ? 'PAID' : 'PENDING',
+    action,
+    raw: json
+  };
+}
 
 async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
+  const isAba = String(bank).toLowerCase() === 'aba';
+
+  if (isAba) {
+    try {
+      const abaResult = await generateAbaPaywayPayment(amount, currency);
+      return abaResult;
+    } catch (abaErr) {
+      console.warn('⚠️ Direct ABA PayWay generation fallback notice:', abaErr.message);
+      // If direct generation fails, fallback to PayLinkAPI
+    }
+  }
+
   const endpoint = String(bank).toLowerCase() === 'bakong' ? 'bakong' : 'aba';
   const url = `${PAYLINK_BASE_URL}/api/${endpoint}/generate-qr`;
   const response = await fetch(url, {
@@ -1240,10 +1424,34 @@ async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
     throw new Error(`PayLinkAPI error: ${response.status} - ${errorText}`);
   }
 
-  return await response.json();
+  const data = await response.json();
+  if (isAba) {
+    data.bank = 'ABA';
+    data.merchantName = ADMIN_ABA_NAME || 'MAKO by H.T';
+  }
+  return data;
 }
 
-async function checkPaymentStatus(tranId, md5) {
+async function checkPaymentStatus(tranId, md5, tx = null) {
+  const transaction = tx || pendingTxs.get(tranId);
+  if (transaction && transaction.bank === 'aba' && transaction.token && transaction.clientId) {
+    try {
+      const abaRes = await checkAbaPaymentStatus(
+        transaction.token,
+        transaction.clientId,
+        transaction.stateRequestTime,
+        transaction.deviceId
+      );
+      if (abaRes.paid || abaRes.status === 'PAID') {
+        return { success: true, paid: true, status: 'PAID' };
+      }
+      return { success: true, paid: false, status: 'PENDING' };
+    } catch (err) {
+      console.warn('ABA status check error:', err.message);
+      return { success: true, paid: false, status: 'PENDING' };
+    }
+  }
+
   const url = `${PAYLINK_BASE_URL}/api/web/check-payment`;
   const response = await fetch(url, {
     method: 'POST',
@@ -1251,7 +1459,7 @@ async function checkPaymentStatus(tranId, md5) {
       'Content-Type': 'application/json',
       'x-api-key': PAYLINK_API_KEY
     },
-    body: JSON.stringify({ tranId, md5 })
+    body: JSON.stringify({ tranId, md5: md5 || transaction?.md5 })
   });
 
   if (!response.ok) {
@@ -1261,6 +1469,7 @@ async function checkPaymentStatus(tranId, md5) {
 
   return await response.json();
 }
+
 
 async function checkMembership(ctx, userId) {
   try {
@@ -2293,6 +2502,13 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
       bank: String(bank).toLowerCase(),
       md5: data.md5,
       tranId,
+      token: data.token || null,
+      clientId: data.clientId || null,
+      stateRequestTime: data.stateRequestTime || null,
+      deviceId: data.deviceId || null,
+      qrString: data.qrString,
+      deepLink: computedDeepLink,
+      androidIntent: computedAndroidIntent,
       msgId: sentMsg.message_id,
       timerId,
       pollInterval,
@@ -3295,9 +3511,10 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    const fallbackUrl = (process.env.ABA_PAYWAY_URL || 'https://link.payway.com.kh/a3550666t').trim();
     const deepLink = qrString
       ? `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(qrString)}`
-      : 'https://link.payway.com.kh/a3550666t';
+      : fallbackUrl;
     const androidIntent = qrString
       ? `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end`
       : deepLink;
@@ -3306,13 +3523,135 @@ const server = http.createServer(async (req, res) => {
     const isAndroid = /Android/i.test(userAgent);
     const targetUrl = isAndroid ? androidIntent : deepLink;
 
-    // Direct HTTP 302 Found: Direct instant protocol handoff to OS with zero webpage body
-    res.writeHead(302, {
-      'Location': targetUrl,
+    res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
     });
-    return res.end(`<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${targetUrl}"></head><body style="background:#000;"><script>window.location.replace(${JSON.stringify(targetUrl)});</script></body></html>`);
+
+    const html = `<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>បើក ABA Mobile...</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #080d1a;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: linear-gradient(180deg, #101b33 0%, #0d1629 100%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      padding: 32px 24px;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+    .aba-badge {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #004d66 0%, #007399 50%, #00a3cc 100%);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      box-shadow: 0 10px 25px rgba(0, 115, 153, 0.4);
+    }
+    h1 {
+      font-size: 19px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: #ffffff;
+    }
+    p {
+      font-size: 13.5px;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .btn-main {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #005F82 0%, #0084b3 100%);
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 800;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0, 95, 130, 0.4);
+      margin-bottom: 12px;
+    }
+    .btn-sub {
+      display: block;
+      width: 100%;
+      padding: 13px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.06);
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2.5px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="aba-badge">ABA</div>
+    <h1>កំពុងបើក ABA Mobile...</h1>
+    <p>ប្រសិនបើកម្មវិធី ABA មិនបើកដោយស្វ័យប្រវត្តិ សូមចុចប៊ូតុងធំខាងក្រោម</p>
+    
+    <a id="btnLaunchAba" href="${targetUrl}" class="btn-main">
+      <div class="spinner"></div>
+      <span>បើក ABA Mobile ភ្លាមៗ</span>
+    </a>
+    
+    <a href="${fallbackUrl}" class="btn-sub">
+      បង់តាមទំព័រ PayWay Web ជំនួសវិញ
+    </a>
+  </div>
+
+  <script>
+    (function() {
+      var target = ${JSON.stringify(targetUrl)};
+      try {
+        window.location.href = target;
+      } catch (e) {}
+    })();
+  </script>
+</body>
+</html>`;
+
+    return res.end(html);
   }
 
   // 2. Mini App API: Check 1xBet ID in App
@@ -3367,7 +3706,21 @@ const server = http.createServer(async (req, res) => {
 
       const tranId = data.tranId;
       const isAba = String(bank).toLowerCase() === 'aba';
-      const displayMerchant = isAba ? ADMIN_ABA_NAME : ADMIN_BAKONG_NAME;
+      const displayMerchant = isAba ? (ADMIN_ABA_NAME || 'MAKO by H.T') : ADMIN_BAKONG_NAME;
+
+      const computedDeepLink = data.deepLink || (data.qrString ? `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}` : null);
+      const computedAndroidIntent = data.androidIntent || (data.qrString ? `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end` : null);
+
+      if (isAba) {
+        abaDeeplinks.set(tranId, {
+          tranId,
+          amount: data.amountFormatted || amount.toFixed(2),
+          qrString: data.qrString,
+          deepLink: computedDeepLink,
+          androidIntent: computedAndroidIntent,
+          expiresAt: Date.now() + 15 * 60 * 1000
+        });
+      }
 
       // Save pending transaction with 3-minute live poller & expiry
       pendingTxs.set(tranId, {
@@ -3382,6 +3735,13 @@ const server = http.createServer(async (req, res) => {
         bank,
         md5: data.md5,
         tranId,
+        token: data.token || null,
+        clientId: data.clientId || null,
+        stateRequestTime: data.stateRequestTime || null,
+        deviceId: data.deviceId || null,
+        qrString: data.qrString,
+        deepLink: computedDeepLink,
+        androidIntent: computedAndroidIntent,
         expiresAt: Date.now() + 3 * 60 * 1000
       });
 
@@ -3399,8 +3759,8 @@ const server = http.createServer(async (req, res) => {
         amount: data.amountFormatted || amount.toFixed(2),
         currency: 'USD',
         bank: data.bank || bank.toUpperCase(),
-        deepLink: data.deepLink || (data.qrString ? `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}` : null),
-        androidIntent: data.androidIntent || (data.qrString ? `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end` : null),
+        deepLink: computedDeepLink,
+        androidIntent: computedAndroidIntent,
         merchantName: displayMerchant
       });
     } catch (err) {
@@ -3845,69 +4205,15 @@ async function registerMenuButton(url) {
   }
 }
 
-// High-Speed Reliable HTTPS Tunnel for Telegram Mini App (Cloudflare)
-let tunnelProc = null;
-let tunnelAttempts = 0;
+// Permanent Reliable HTTPS URL for Telegram Mini App (Render Production)
 function initHttpsTunnel() {
-  const configuredUrl = (process.env.MINIAPP_URL || process.env.RENDER_EXTERNAL_URL || '').trim();
-  if (configuredUrl && configuredUrl.startsWith('https://') && !configuredUrl.includes('loca.lt')) {
-    activeMiniappUrl = configuredUrl;
-    console.log(`🚀 Using Configured Mini App URL (Render/Production): ${activeMiniappUrl}`);
-    registerMenuButton(activeMiniappUrl);
-    return;
-  }
-
-  console.log(`🔄 Establishing Cloudflare HTTPS tunnel for Telegram Mini App...`);
-  const { spawn } = require('child_process');
-
-  if (tunnelProc) {
-    try { tunnelProc.kill(); } catch (_) {}
-  }
-
-  // Use npx cloudflared for a free quick tunnel
-  tunnelProc = spawn('npx', ['-y', 'cloudflared', 'tunnel', '--url', `http://127.0.0.1:${PORT}`, '--no-autoupdate'], {
-    shell: true,
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
-  tunnelAttempts++;
-
-  let urlFound = false;
-  const parseUrlFromOutput = (chunk) => {
-    const text = chunk.toString();
-    // Cloudflare quick tunnels output URLs like https://xxxxx.trycloudflare.com
-    const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
-    if (match && !urlFound) {
-      urlFound = true;
-      activeMiniappUrl = match[0];
-      mediaCache.activeMiniappUrl = activeMiniappUrl;
-      saveMediaCache();
-      console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      console.log(`🎉 LIVE TELEGRAM MINI APP HTTPS URL (Cloudflare):`);
-      console.log(`👉 ${activeMiniappUrl}`);
-      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-      lastRegisteredMenuUrl = null;
-      registerMenuButton(activeMiniappUrl);
-    }
-  };
-
-  tunnelProc.stdout.on('data', parseUrlFromOutput);
-  tunnelProc.stderr.on('data', parseUrlFromOutput);
-
-  tunnelProc.on('close', (code) => {
-    console.log(`⚠️ Cloudflare tunnel closed (exit code: ${code}). Reconnecting in 5 seconds...`);
-    lastRegisteredMenuUrl = null;
-    setTimeout(() => {
-      initHttpsTunnel();
-    }, 5000);
-  });
-
-  tunnelProc.on('error', (err) => {
-    console.warn('Tunnel process error:', err.message);
-    setTimeout(() => {
-      initHttpsTunnel();
-    }, 5000);
-  });
-
+  const configuredUrl = (process.env.MINIAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://makopay-bot.onrender.com').trim();
+  activeMiniappUrl = configuredUrl;
+  console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  console.log(`🚀 PERMANENT TELEGRAM MINI APP URL (Render Production):`);
+  console.log(`👉 ${activeMiniappUrl}`);
+  console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+  registerMenuButton(activeMiniappUrl);
 }
 
 bot.catch((err) => {

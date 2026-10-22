@@ -49,8 +49,10 @@ services:
       - key: MOBCASH_DOH_DOMAIN
         value: "mob-kassa.bet-1x.com"
       - key: ADMIN_BANK_NAME
-        value: "MAKO H.T"
+        value: "MAKO by H.T"
       - key: ADMIN_ABA_NAME
-        value: "MAKO H.T"
+        value: "MAKO by H.T"
       - key: ADMIN_BAKONG_NAME
         value: "MAKO CAMBO"
+      - key: MINIAPP_URL
+        value: "https://makopay-bot.onrender.com"

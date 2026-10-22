@@ -125,6 +125,7 @@
     // Voucher View Elements
     btnBackFromVoucher: $('btnBackFromVoucher'),
     voucherBankCard: $('voucherBankCard'),
+    voucherHeaderTitle: $('voucherHeaderTitle'),
     voucherBankNameText: $('voucherBankNameText'),
     voucherIdText: $('voucherIdText'),
     voucherAmountText: $('voucherAmountText'),
@@ -134,6 +135,7 @@
     qrExpiredView: $('qrExpiredView'),
     voucherTimerSec: $('voucherTimerSec'),
     voucherMerchantNameText: $('voucherMerchantNameText'),
+    khqrScanGuide: $('khqrScanGuide'),
     voucherBillIdText: $('voucherBillIdText'),
     btnCopyVoucherBill: $('btnCopyVoucherBill'),
     btnOpenAbaApp: $('btnOpenAbaApp'),
@@ -465,14 +467,17 @@
 
   // ================= DISPLAY VOUCHER & LIVE POLLER =================
   function displayVoucherCard(tx) {
-    const isBakong = state.selectedBank === 'bakong';
+    const isBakong = state.selectedBank === 'bakong' || String(tx.bank || '').toLowerCase() === 'bakong';
     if (els.voucherBankCard) {
       els.voucherBankCard.className = `khqr-official-card ${isBakong ? 'bakong' : 'aba'}`;
+    }
+    if (els.voucherHeaderTitle) {
+      els.voucherHeaderTitle.textContent = isBakong ? 'BAKONG KHQR' : 'ABA PAYWAY';
     }
     if (els.voucherBankNameText) {
       els.voucherBankNameText.textContent = isBakong ? 'BAKONG KHQR' : 'ABA PAYWAY';
     }
-    const merchantName = isBakong ? 'MAKO CAMBO' : 'MAKO H.T';
+    const merchantName = isBakong ? 'MAKO CAMBO' : 'MAKO by H.T';
     if (els.voucherMerchantNameText) {
       els.voucherMerchantNameText.textContent = tx.merchantName || merchantName;
     }
@@ -484,6 +489,11 @@
     if (els.qrCenterLogo) {
       els.qrCenterLogo.textContent = isBakong ? 'KHQR' : 'ABA';
       els.qrCenterLogo.style.background = isBakong ? '#E21A1A' : '#005F82';
+    }
+    if (els.khqrScanGuide) {
+      els.khqrScanGuide.textContent = isBakong
+        ? 'Scan with Bakong App, ABA Mobile, or other Mobile Banking App supporting KHQR'
+        : 'Scan with ABA Mobile, or other Mobile Banking App supporting KHQR';
     }
 
     // Clear and hide expired state
@@ -511,20 +521,22 @@
       fallbackQrImage(tx);
     }
 
-    // Direct ABA Mobile App button
-    if (state.selectedBank === 'aba' && els.btnOpenAbaApp) {
+    // Direct ABA Mobile App button (Enabled for ABA payments)
+    if (!isBakong && els.btnOpenAbaApp) {
       const qrStr = tx.qrString || '';
       const deepLink = tx.deepLink || (qrStr ? `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(qrStr)}` : null);
-      const androidIntent = tx.androidIntent || (qrStr ? `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(qrStr)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end` : null);
 
-      if (deepLink || androidIntent) {
+      if (deepLink) {
         els.btnOpenAbaApp.style.display = 'flex';
         els.btnOpenAbaApp.onclick = () => {
           tgHaptic('medium');
-          const isAndroid = /Android/i.test(navigator.userAgent);
-          const targetUrl = isAndroid && androidIntent ? androidIntent : deepLink;
-          if (targetUrl) {
-            window.location.href = targetUrl;
+          // Telegram WebApp restricts custom schemes (abamobilebank://) directly in webview.
+          // Routing via our permanent Render HTTPS endpoint (/pay-aba) opens in system browser cleanly!
+          const payAbaUrl = `${window.location.origin}/pay-aba?tranId=${encodeURIComponent(tx.tranId)}&qr=${encodeURIComponent(qrStr)}`;
+          if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openLink === 'function') {
+            window.Telegram.WebApp.openLink(payAbaUrl);
+          } else {
+            window.location.href = deepLink;
           }
         };
       } else {
