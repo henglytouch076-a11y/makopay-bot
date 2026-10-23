@@ -2159,16 +2159,13 @@ function showUsdAmountScreen(ctx, oneXBetId, playerName = null) {
   const reply_markup = {
     inline_keyboard: [
       [
-        { text: '🧪 $0.02 (Test)', callback_data: `sel_bank_0.02_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
         { text: '$3.00', callback_data: `sel_bank_3_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
-        { text: '$5.00', callback_data: `sel_bank_5_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' }
+        { text: '$5.00', callback_data: `sel_bank_5_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
+        { text: '$10.00', callback_data: `sel_bank_10_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' }
       ],
       [
-        { text: '$10.00', callback_data: `sel_bank_10_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
         { text: '$20.00', callback_data: `sel_bank_20_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
-        { text: '$50.00', callback_data: `sel_bank_50_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' }
-      ],
-      [
+        { text: '$50.00', callback_data: `sel_bank_50_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' },
         { text: '$100.00', callback_data: `sel_bank_100_USD_${oneXBetId}`, icon_custom_emoji_id: BTN_ICONS.MONEY, style: 'primary' }
       ],
       [
@@ -2218,8 +2215,8 @@ bot.action(/topup_custom_USD_(.+)/, async (ctx) => {
     `━━━━━━━━━━━━━━━\n` +
     `${ANIM.ONEXBET} <b>ID 1xBet:</b> <code>${oneXBetId}</code>\n` +
     `${ANIM.SPARKLES} <i>សូមបញ្ចូលទឹកប្រាក់ក្នុងប្រអប់សារ:</i>\n\n` +
-    `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>0.02</code> , <code>3</code> , <code>3.50</code> ,\n` +
-    `<i>(Min: $0.02 - Max: $10000)</i>\n` +
+    `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>1</code> , <code>3</code> , <code>3.50</code> ,\n` +
+    `<i>(Min: $1 - Max: $10000)</i>\n` +
     `━━━━━━━━━━━━━━━`;
 
   const reply_markup = {
@@ -3328,13 +3325,13 @@ ${ANIM.BULB} <b>សូមចំណាំ៖</b>
     const usdAmount = Math.round(parseFloat(rawInput) * 100) / 100;
     const oneXBetId = userState?.oneXBetId || 'N/A';
 
-    if (isNaN(usdAmount) || usdAmount < 0.02 || usdAmount > 10000) {
+    if (isNaN(usdAmount) || usdAmount < 1 || usdAmount > 10000) {
       const errText =
         `${ANIM.WARN} <b>ចំនួនទឹកប្រាក់មិនត្រឹមត្រូវទេ!</b>\n` +
         `━━━━━━━━━━━━━━━\n` +
         `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${oneXBetId}</code>\n` +
-        `${ANIM.CROSS} <b>សូមបញ្ចូលទឹកប្រាក់ (Min: $0.02 - Max: $10000)!</b>\n` +
-        `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>0.02</code> , <code>3</code> , <code>3.50</code> ,\n` +
+        `${ANIM.CROSS} <b>សូមបញ្ចូលទឹកប្រាក់ (Min: $1 - Max: $10000)!</b>\n` +
+        `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>1</code> , <code>3</code> , <code>3.50</code> ,\n` +
         `━━━━━━━━━━━━━━━`;
       const reply_markup = {
         inline_keyboard: [
@@ -3661,8 +3658,8 @@ const server = http.createServer(async (req, res) => {
       const username = body.username || 'User';
       const name = body.name || 'Member';
 
-      if (isNaN(amount) || amount < 0.02 || amount > 10000) {
-        return sendJson(res, 400, { success: false, error: 'ចំនួនទឹកប្រាក់ត្រូវតែចាប់ពី $0.02 ឡើងទៅ (អតិបរមា: $10,000)' });
+      if (isNaN(amount) || amount < 1 || amount > 10000) {
+        return sendJson(res, 400, { success: false, error: 'ចំនួនទឹកប្រាក់ត្រូវតែចាប់ពី $1.00 ឡើងទៅ (អតិបរមា: $10,000)' });
       }
 
       const data = await generateKHQR(amount, 'USD', bank);
