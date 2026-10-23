@@ -39,7 +39,7 @@
   // Withdraw Global State (Code + QR Code)
   const withdrawState = {
     code: '',
-    bank: 'Bakong / ABA KHQR',
+    bank: 'Bakong KHQR',
     qrBase64: null,
     fileName: ''
   };
@@ -59,7 +59,7 @@
         const u = tg.initDataUnsafe.user;
         state.user.id = u.id;
         state.user.name = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username || 'VIP Member';
-        state.user.username = u.username ? `@${u.username}` : '';
+        state.user.username = u.username ? `@${u.username}` : `ID: ${u.id}`;
         state.user.photoUrl = u.photo_url || null;
       }
     } catch (e) {
@@ -138,7 +138,6 @@
     khqrScanGuide: $('khqrScanGuide'),
     voucherBillIdText: $('voucherBillIdText'),
     btnCopyVoucherBill: $('btnCopyVoucherBill'),
-    btnOpenAbaApp: $('btnOpenAbaApp'),
     btnRegenQr: $('btnRegenQr'),
 
     // Top-Up Success Elements
@@ -415,8 +414,8 @@
       return;
     }
 
-    if (isNaN(finalAmount) || finalAmount < 0.02 || finalAmount > 10000) {
-      alert('សូមជ្រើសរើស ឬបញ្ចូលទឹកប្រាក់ចាប់ពី $0.02 ដល់ $10000 USD!');
+    if (isNaN(finalAmount) || finalAmount < 3 || finalAmount > 10000) {
+      alert('សូមជ្រើសរើស ឬបញ្ចូលទឹកប្រាក់ចាប់ពី $3.00 ដល់ $10000 USD (3$ ឡើងទៅ)!');
       return;
     }
 
@@ -467,17 +466,16 @@
 
   // ================= DISPLAY VOUCHER & LIVE POLLER =================
   function displayVoucherCard(tx) {
-    const isBakong = state.selectedBank === 'bakong' || String(tx.bank || '').toLowerCase() === 'bakong';
     if (els.voucherBankCard) {
-      els.voucherBankCard.className = `khqr-official-card ${isBakong ? 'bakong' : 'aba'}`;
+      els.voucherBankCard.className = 'khqr-official-card bakong';
     }
     if (els.voucherHeaderTitle) {
-      els.voucherHeaderTitle.textContent = isBakong ? 'BAKONG KHQR' : 'ABA PAYWAY';
+      els.voucherHeaderTitle.textContent = 'BAKONG KHQR';
     }
     if (els.voucherBankNameText) {
-      els.voucherBankNameText.textContent = isBakong ? 'BAKONG KHQR' : 'ABA PAYWAY';
+      els.voucherBankNameText.textContent = 'BAKONG KHQR';
     }
-    const merchantName = isBakong ? 'MAKO CAMBO' : 'MAKO by H.T';
+    const merchantName = 'MAKO CAMBO';
     if (els.voucherMerchantNameText) {
       els.voucherMerchantNameText.textContent = tx.merchantName || merchantName;
     }
@@ -487,13 +485,11 @@
     }
     if (els.voucherBillIdText) els.voucherBillIdText.textContent = tx.tranId;
     if (els.qrCenterLogo) {
-      els.qrCenterLogo.textContent = isBakong ? 'KHQR' : 'ABA';
-      els.qrCenterLogo.style.background = isBakong ? '#E21A1A' : '#005F82';
+      els.qrCenterLogo.textContent = 'KHQR';
+      els.qrCenterLogo.style.background = '#E21A1A';
     }
     if (els.khqrScanGuide) {
-      els.khqrScanGuide.textContent = isBakong
-        ? 'Scan with Bakong App, ABA Mobile, or other Mobile Banking App supporting KHQR'
-        : 'Scan with ABA Mobile, or other Mobile Banking App supporting KHQR';
+      els.khqrScanGuide.textContent = 'Scan with Bakong App or any Mobile Banking App supporting KHQR';
     }
 
     // Clear and hide expired state
@@ -519,31 +515,6 @@
       }
     } else {
       fallbackQrImage(tx);
-    }
-
-    // Direct ABA Mobile App button (Enabled for ABA payments)
-    if (!isBakong && els.btnOpenAbaApp) {
-      const qrStr = tx.qrString || '';
-      const deepLink = tx.deepLink || (qrStr ? `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(qrStr)}` : null);
-
-      if (deepLink) {
-        els.btnOpenAbaApp.style.display = 'flex';
-        els.btnOpenAbaApp.onclick = () => {
-          tgHaptic('medium');
-          // Telegram WebApp restricts custom schemes (abamobilebank://) directly in webview.
-          // Routing via our permanent Render HTTPS endpoint (/pay-aba) opens in system browser cleanly!
-          const payAbaUrl = `${window.location.origin}/pay-aba?tranId=${encodeURIComponent(tx.tranId)}&qr=${encodeURIComponent(qrStr)}`;
-          if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openLink === 'function') {
-            window.Telegram.WebApp.openLink(payAbaUrl);
-          } else {
-            window.location.href = deepLink;
-          }
-        };
-      } else {
-        els.btnOpenAbaApp.style.display = 'none';
-      }
-    } else if (els.btnOpenAbaApp) {
-      els.btnOpenAbaApp.style.display = 'none';
     }
   }
 
@@ -574,7 +545,6 @@
         clearInterval(state.pollInterval);
         els.qrExpiredView.style.display = 'flex';
         els.btnRegenQr.style.display = 'flex';
-        els.btnOpenAbaApp.style.display = 'none';
       }
     }, 1000);
   }
@@ -676,7 +646,7 @@
 
   function renderProfileUI() {
     els.profileNameText.textContent = state.user.name;
-    els.profileUsernameText.textContent = state.user.username || '@member';
+    els.profileUsernameText.textContent = state.user.username || `ID: ${state.user.id}`;
     els.profileIdNum.textContent = state.user.id;
     els.headerBalanceText.textContent = `$${state.user.balance.toFixed(2)}`;
     els.profileBigBalance.textContent = `$${state.user.balance.toFixed(2)}`;
@@ -718,14 +688,15 @@
 
   // ================= GUIDE TAB SWITCH =================
   function setupGuideSwitch() {
+    if (!els.guideButtons || els.guideButtons.length === 0) return;
     els.guideButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         tgHaptic('selection');
         els.guideButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         const g = btn.getAttribute('data-guide');
-        els.guideTopUpBlock.style.display = (g === 'topup') ? 'flex' : 'none';
-        els.guideWithdrawBlock.style.display = (g === 'withdraw') ? 'flex' : 'none';
+        if (els.guideTopUpBlock) els.guideTopUpBlock.style.display = (g === 'topup') ? 'flex' : 'none';
+        if (els.guideWithdrawBlock) els.guideWithdrawBlock.style.display = (g === 'withdraw') ? 'flex' : 'none';
       });
     });
   }

@@ -57,7 +57,7 @@ function getLogoPhoto() {
 let cachedAddFundsVideoFileId = process.env.ADDFUNDS_VIDEO_FILE_ID || mediaCache.addFundsVideoFileId || null;
 function getAddFundsVideo() {
   if (cachedAddFundsVideoFileId) return cachedAddFundsVideoFileId;
-  const filePath = resolveVideoPath('addfound', 'addfunds', 'topup');
+  const filePath = resolveVideoPath('howtoadfounf', 'howtoadfound', 'howtoaddfunds', 'howtoaddfound', 'addfound', 'addfunds', 'topup');
   return filePath ? { source: filePath } : null;
 }
 
@@ -378,12 +378,8 @@ const ADMIN_BANK_NAME = process.env.ADMIN_BANK_NAME || 'MAKO H.T';
 const ADMIN_ABA_NAME = process.env.ADMIN_ABA_NAME || ADMIN_BANK_NAME;
 const ADMIN_BAKONG_NAME = process.env.ADMIN_BAKONG_NAME || 'MAKO CAMBO';
 
-function getAdminBankLine(bank = 'aba') {
-  const isBakong = String(bank || '').toLowerCase().includes('bakong');
-  if (isBakong) {
-    return `${ANIM.BAKONG} <b>Bakong : ${ADMIN_BAKONG_NAME}</b>`;
-  }
-  return `${ANIM.ABA} <b>ABA : ${ADMIN_ABA_NAME}</b>`;
+function getAdminBankLine(bank = 'bakong') {
+  return `${ANIM.BAKONG} <b>Bakong : ${ADMIN_BAKONG_NAME}</b>`;
 }
 
 function getWithdrawVerifyScreen(userState) {
@@ -646,8 +642,12 @@ function getHistoryScreen(userId, filter = 'today', isUserAdmin = false) {
         if (item.accountName) text += `👤 <b>ឈ្មោះ:</b> <b>${item.accountName}</b>\n`;
         text += `${ANIM.RECEIPT} <b>Withdraw ID:</b> <b>${item.id}</b>\n`;
       }
-      if (isUserAdmin && item.name) {
-        text += `${ANIM.USER} <b>អតិថិជន:</b> ${item.name} (${item.username || 'គ្មាន'})\n`;
+      if (isUserAdmin && (item.name || item.userId)) {
+        const hasU = item.username && item.username !== 'គ្មាន' && item.username !== '@គ្មាន' && item.username !== 'User';
+        const userDisplay = hasU
+          ? (item.username.startsWith('@') ? item.username : `@${item.username}`)
+          : `ID: ${item.userId}`;
+        text += `${ANIM.USER} <b>អតិថិជន:</b> ${item.name || 'User'} (${userDisplay})\n`;
       }
       text += `⚡️ <b>ស្ថានភាព:</b> ${statusBadge}\n`;
       text += `🕒 <b>កាលបរិច្ឆេទ:</b> <b>${item.displayDate}</b>\n`;
@@ -662,26 +662,159 @@ function getHistoryScreen(userId, filter = 'today', isUserAdmin = false) {
   text += `\n━━━━━━━━━━━━━━━\n` +
     `💡 <i>ជ្រើសរើសប៊ូតុងខាងក្រោមដើម្បីពិនិត្យមើលតាមកាលបរិច្ឆេទ៖</i>`;
 
+  const keyboard = [
+    [
+      {
+        text: filter === 'today' ? '• 📅 ថ្ងៃនេះ •' : '📅 ថ្ងៃនេះ (Today)',
+        callback_data: 'hist_today',
+        style: filter === 'today' ? 'success' : 'primary'
+      },
+      {
+        text: filter === 'ytd' ? '• 📆 ម្សិលមិញ •' : '📆 ម្សិលមិញ (YTD)',
+        callback_data: 'hist_ytd',
+        style: filter === 'ytd' ? 'success' : 'primary'
+      },
+      {
+        text: filter === 'all' ? '• 📋 ទាំងអស់ •' : '📋 ទាំងអស់ (All)',
+        callback_data: 'hist_all',
+        style: filter === 'all' ? 'success' : 'primary'
+      }
+    ]
+  ];
+
+  if (isUserAdmin) {
+    keyboard.push([
+      {
+        text: '🔍 ស្វែងរកតាម ID 1xBet',
+        callback_data: 'admin_hist_search_1xbet',
+        icon_custom_emoji_id: BTN_ICONS.DIAMOND,
+        style: 'success'
+      }
+    ]);
+  }
+
+  keyboard.push([
+    {
+      text: 'ទៅកាន់ Menu ចម្បង',
+      callback_data: 'back_main',
+      icon_custom_emoji_id: BTN_ICONS.BACK,
+      style: 'danger'
+    }
+  ]);
+
+  const reply_markup = { inline_keyboard: keyboard };
+
+  return { text, reply_markup };
+}
+
+function getAdminSearchScreen() {
+  const text =
+    `🔍 <b>ស្វែងរកប្រវត្តិប្រតិបត្តិការតាម ID 1xBet</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `👑 <b>Admin Search Tool:</b>\n` +
+    `<i>សូមវាយបញ្ចូលលេខ ID 1xBet របស់ User ដើម្បីពិនិត្យមើលប្រវត្តិប្រតិបត្តិការ និងកាលបរិច្ឆេទទាំងអស់៖</i>\n\n` +
+    `💡 <b>ឧទាហរណ៍:</b> <code>1407771169</code>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━`;
+
   const reply_markup = {
     inline_keyboard: [
       [
         {
-          text: filter === 'today' ? '• 📅 ថ្ងៃនេះ •' : '📅 ថ្ងៃនេះ (Today)',
-          callback_data: 'hist_today',
-          style: filter === 'today' ? 'success' : 'primary'
+          text: 'ត្រឡប់ក្រោយ (Back)',
+          callback_data: 'menu_history',
+          icon_custom_emoji_id: BTN_ICONS.BACK,
+          style: 'primary'
         },
         {
-          text: filter === 'ytd' ? '• 📆 ម្សិលមិញ •' : '📆 ម្សិលមិញ (YTD)',
-          callback_data: 'hist_ytd',
-          style: filter === 'ytd' ? 'success' : 'primary'
-        },
+          text: 'ទៅកាន់ Menu ចម្បង',
+          callback_data: 'back_main',
+          icon_custom_emoji_id: BTN_ICONS.CANCEL,
+          style: 'danger'
+        }
+      ]
+    ]
+  };
+
+  return { text, reply_markup };
+}
+
+function showAdminSearch1xBetHistory(ctx, searchId) {
+  syncExistingRequestsToHistory();
+  const cleaned = String(searchId || '').trim();
+  const matches = transactionsHistory.filter(h => {
+    const oxId = String(h.oneXBetId || '').trim();
+    const tranId = String(h.id || '').trim();
+    return (oxId && oxId === cleaned) || (tranId && tranId === cleaned);
+  });
+
+  const now = new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' });
+
+  let text =
+    `🔍 <b>លទ្ធផលស្វែងរកប្រវត្តិ ID 1xBet:</b> <code>${cleaned}</code>\n` +
+    `👑 <b>Admin View:</b> <code>${matches.length} ប្រតិបត្តិការ</code>\n` +
+    `🕒 <b>កាលបរិច្ឆេទពិនិត្យ:</b> <code>${now}</code>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+  if (matches.length === 0) {
+    text += `\n<i>⚠️ មិនមានប្រវត្តិប្រតិបត្តិការសម្រាប់ ID 1xBet «<code>${cleaned}</code>» ឡើយ!</i>\n` +
+      `💡 <i>សូមពិនិត្យមើលលេខ ID 1xBet ឡើងវិញ ឬ ID នេះមិនទាន់មានប្រតិបត្តិការ។</i>\n`;
+  } else {
+    const completedTotal = matches
+      .filter(m => m.status === 'COMPLETED' && m.type === 'topup')
+      .reduce((sum, m) => sum + Number(m.amount || 0), 0);
+
+    text += `💰 <b>សរុបប្រាក់បញ្ចូលជោគជ័យ:</b> <b>+$${completedTotal.toFixed(2)} USD</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+    matches.slice(0, 15).forEach((item, idx) => {
+      const isTopup = item.type === 'topup';
+      const typeIcon = isTopup ? ANIM.DEPOSIT : ANIM.WITHDRAW;
+      const typeName = isTopup ? 'បញ្ចូលប្រាក់ (Top-Up)' : 'ដកប្រាក់ (Withdraw)';
+
+      let statusBadge = '⏳ កំពុងរង់ចាំ (Pending)';
+      if (item.status === 'COMPLETED') statusBadge = '✅ ជោគជ័យ (Done)';
+      if (item.status === 'REJECTED') statusBadge = '❌ បានបដិសេធ (Cancelled)';
+
+      const hasU = item.username && item.username !== 'គ្មាន' && item.username !== '@គ្មាន' && item.username !== 'User';
+      const userDisplay = hasU
+        ? (item.username.startsWith('@') ? item.username : `@${item.username}`)
+        : `ID: ${item.userId}`;
+
+      const dateStr = item.displayDate || item.date || 'N/A';
+
+      text += `\n<b>#${idx + 1}. ${typeIcon} ${typeName}</b>\n` +
+        `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${item.oneXBetId || cleaned}</code>\n` +
+        `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(item.amount || 0).toFixed(2)} USD</b>\n` +
+        `${ANIM.CARD} <b>ធនាគារ:</b> <b>${item.bank ? item.bank.toUpperCase() : 'BAKONG KHQR'}</b>\n` +
+        `${ANIM.USER} <b>អតិថិជន:</b> ${item.name || 'User'} (${userDisplay})\n` +
+        `${ANIM.RECEIPT} <b>វិក្កយបត្រ:</b> <code>${item.id}</code>\n` +
+        `⚡️ <b>ស្ថានភាព:</b> ${statusBadge}\n` +
+        `🕒 <b>កាលបរិច្ឆេទ:</b> <b>${dateStr}</b>\n` +
+        `──────────────────`;
+    });
+
+    if (matches.length > 15) {
+      text += `\n<i>... និងមានចំនួន ${matches.length - 15} ប្រតិបត្តិការចាស់ៗទៀត</i>\n`;
+    }
+  }
+
+  const reply_markup = {
+    inline_keyboard: [
+      [
         {
-          text: filter === 'all' ? '• 📋 ទាំងអស់ •' : '📋 ទាំងអស់ (All)',
-          callback_data: 'hist_all',
-          style: filter === 'all' ? 'success' : 'primary'
+          text: '🔍 ស្វែងរក ID ផ្សេងទៀត',
+          callback_data: 'admin_hist_search_1xbet',
+          icon_custom_emoji_id: BTN_ICONS.DIAMOND,
+          style: 'success'
         }
       ],
       [
+        {
+          text: '📋 ប្រវត្តិទាំងអស់ (All)',
+          callback_data: 'hist_all',
+          icon_custom_emoji_id: BTN_ICONS.CHART,
+          style: 'primary'
+        },
         {
           text: 'ទៅកាន់ Menu ចម្បង',
           callback_data: 'back_main',
@@ -692,7 +825,7 @@ function getHistoryScreen(userId, filter = 'today', isUserAdmin = false) {
     ]
   };
 
-  return { text, reply_markup };
+  return showScreen(ctx, { text, reply_markup });
 }
 
 function syncExistingRequestsToHistory() {
@@ -944,7 +1077,6 @@ async function processSuccessfulTopup(tranId) {
     `━━━━━━━━━━━━━━━\n` +
     `${ANIM.ONEXBET} <b>ID 1xBet:</b> <code>${tx.oneXBetId}</code>\n` +
     `${ANIM.LIGHTNING} <b>ទឹកប្រាក់បង់:</b> <b>${paidAmtDesc}</b>\n` +
-    `${ANIM.MONEY} <b>សមតុល្យ:</b> <b>$${user.balance.toFixed(2)} USD</b>\n` +
     `🔷 <b>វិក្កយបត្រ:</b> <b>${tx.tranId}</b>\n` +
     `━━━━━━━━━━━━━━━\n` +
     `🌀 <i><b>ទឹកប្រាក់កំពុងបញ្ចូលទៅ 1xBet...</b></i>`;
@@ -989,9 +1121,10 @@ async function processSuccessfulTopup(tranId) {
   }
 
   // 6. Notify Admin Top-Up Group ONCE ONLY (Image 1 Format)
-  const userHandle = (tx.username && tx.username !== 'គ្មាន' && tx.username !== '@គ្មាន')
+  const hasUsername = tx.username && tx.username !== 'គ្មាន' && tx.username !== '@គ្មាន' && tx.username !== 'User';
+  const userHandle = hasUsername
     ? ` (${tx.username.startsWith('@') ? tx.username : `@${tx.username}`})`
-    : '';
+    : ` (ID: ${tx.userId})`;
 
   const hiddenWaitLink = sentSuccess?.message_id
     ? `<a href="tg://waitId/${sentSuccess.message_id}">&#8203;</a>`
@@ -1145,8 +1278,8 @@ async function showScreen(ctx, { text, reply_markup, photo = null, video = null,
     }
   }
 
-  // 2. Video-to-Video or Video-to-Menu caption edit (Instant, 0ms, zero reload)
-  if (ctx.callbackQuery && !photo && ctx.callbackQuery.message?.video) {
+  // 2. Video-to-Menu caption edit (Only when NOT sending/switching a video)
+  if (ctx.callbackQuery && !photo && !video && ctx.callbackQuery.message?.video) {
     try {
       await ctx.editMessageCaption(text, { parse_mode: 'HTML', reply_markup });
       userActiveMsgs.set(chatId, ctx.callbackQuery.message.message_id);
@@ -1404,21 +1537,8 @@ async function checkAbaPaymentStatus(token, clientId, stateRequestTime, deviceId
   };
 }
 
-async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
-  const isAba = String(bank).toLowerCase() === 'aba';
-
-  if (isAba) {
-    try {
-      const abaResult = await generateAbaPaywayPayment(amount, currency);
-      return abaResult;
-    } catch (abaErr) {
-      console.error('⚠️ ABA PayWay generation error:', abaErr.message);
-      throw new Error(`ABA QR Generation Error: ${abaErr.message}`);
-    }
-  }
-
-  const endpoint = String(bank).toLowerCase() === 'bakong' ? 'bakong' : 'aba';
-  const url = `${PAYLINK_BASE_URL}/api/${endpoint}/generate-qr`;
+async function generateKHQR(amount, currency = 'USD', bank = 'bakong') {
+  const url = `${PAYLINK_BASE_URL}/api/bakong/generate-qr`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -1634,11 +1754,6 @@ function getMainMenu(user) {
         text: 'របៀបដាក់ប្រាក់',
         callback_data: 'guide_topup',
         icon_custom_emoji_id: BTN_ICONS.BULB
-      },
-      {
-        text: 'របៀបដកប្រាក់',
-        callback_data: 'guide_withdraw',
-        icon_custom_emoji_id: BTN_ICONS.CARD
       }
     ],
     [
@@ -1998,9 +2113,9 @@ ${ANIM.SPARKLES} <i>ខាងក្រោមនេះជាការណែនា
 ${ANIM.CHECK} <b>ជំហានងាយៗ៖</b>
 1️⃣ ចុចប៊ូតុង <b>«ដាក់ប្រាក់»</b> នៅលើ Menu ចម្បង
 2️⃣ បញ្ចូលលេខ <b>ID 1xBet</b> របស់អ្នក
-3️⃣ ជ្រើសរើសចំនួនទឹកប្រាក់ជាដុល្លារ (USD)
-4️⃣ ស្កេនទូទាត់តាម <b>KHQR</b> (Bakong, ABA...)
-5️⃣ ប្រព័ន្ធនឹងបញ្ជូនទៅ Admin ភ្លាមៗដើម្បី Add Funds ចូលគណនី 1xBet របស់អ្នក!`;
+3️⃣ ជ្រើសរើសចំនួនទឹកប្រាក់ជាដុល្លារចាប់ពី $3 ឡើងទៅ (USD)
+4️⃣ ស្កេនទូទាត់តាម <b>Bakong KHQR</b>
+5️⃣ ប្រព័ន្ធនឹងបញ្ចូលទឹកប្រាក់ជូនភ្លាមៗ (Add Funds) ចូលគណនី 1xBet របស់អ្នក!`;
 
   const reply_markup = {
     inline_keyboard: [
@@ -2152,7 +2267,6 @@ function showUsdAmountScreen(ctx, oneXBetId, playerName = null) {
     `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${oneXBetId}</code>\n` +
     `${ANIM.USER} <b>ឈ្មោះ:</b> <b>${displayName}</b>\n` +
     `${ANIM.MONEY} <b>រូបិយប័ណ្ណ:</b> <b>USD ($)</b>\n` +
-    `${ANIM.MONEY} <b>សមតុល្យ:</b> <b>$${user.balance.toFixed(2)} USD</b>\n` +
     `━━━━━━━━━━━━━━━\n` +
     `${ANIM.DOWN} <b>សូមជ្រើសរើសចំនួនទឹកប្រាក់ (USD):</b>`;
 
@@ -2215,8 +2329,8 @@ bot.action(/topup_custom_USD_(.+)/, async (ctx) => {
     `━━━━━━━━━━━━━━━\n` +
     `${ANIM.ONEXBET} <b>ID 1xBet:</b> <code>${oneXBetId}</code>\n` +
     `${ANIM.SPARKLES} <i>សូមបញ្ចូលទឹកប្រាក់ក្នុងប្រអប់សារ:</i>\n\n` +
-    `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>1</code> , <code>3</code> , <code>3.50</code> ,\n` +
-    `<i>(Min: $1 - Max: $10000)</i>\n` +
+    `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>3</code> , <code>5</code> , <code>10</code> , <code>3.50</code> ,\n` +
+    `<i>(Min: $3 - Max: $10000 | 3$ ឡើងទៅ)</i>\n` +
     `━━━━━━━━━━━━━━━`;
 
   const reply_markup = {
@@ -2247,38 +2361,29 @@ bot.action(/topup_custom_KHR_(.+)/, async (ctx) => {
   return showUsdAmountScreen(ctx, oneXBetId);
 });
 
-// Step 3: Choose Bank (Bakong or ABA)
+// Step 3: Choose Bank (Bakong Only)
 function showBankSelectScreen(ctx, amount, currency = 'USD', oneXBetId, explicitAmount = null) {
   const displayAmount = `$${parseFloat(explicitAmount || amount).toFixed(2)} USD`;
   const amountParam = explicitAmount !== null ? explicitAmount : amount;
 
   const text =
-    `${ANIM.CARD} <b>1xBet Top-Up | Step 3 of 3</b>\n` +
+    `${ANIM.CARD} <b>1xBet Top-Up | Bakong KHQR</b>\n` +
     `━━━━━━━━━━━━━━━\n` +
     `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${oneXBetId}</code>\n` +
     `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>${displayAmount}</b>\n` +
     `━━━━━━━━━━━━━━━\n` +
     `${ANIM.BAKONG} <b>Bakong : ${ADMIN_BAKONG_NAME}</b>\n` +
-    `${ANIM.ABA} <b>ABA : ${ADMIN_ABA_NAME}</b>\n` +
     `━━━━━━━━━━━━━━━\n` +
-    `${ANIM.DOWN} <b>សូមជ្រើសរើសធនាគារទូទាត់៖</b>`;
+    `${ANIM.DOWN} <b>សូមចុចប៊ូតុងខាងក្រោមដើម្បីបង្កើតកូដទូទាត់៖</b>`;
 
   const reply_markup = {
     inline_keyboard: [
       [
         {
-          text: `Bakong (${ADMIN_BAKONG_NAME})`,
+          text: `បង់ប្រាក់តាម Bakong (${ADMIN_BAKONG_NAME})`,
           callback_data: `pay_bank_bakong_${amountParam}_USD_${oneXBetId}`,
           icon_custom_emoji_id: BTN_ICONS.BAKONG,
           style: 'primary'
-        }
-      ],
-      [
-        {
-          text: `ABA Bank (${ADMIN_ABA_NAME})`,
-          callback_data: `pay_bank_aba_${amountParam}_USD_${oneXBetId}`,
-          icon_custom_emoji_id: BTN_ICONS.ABA,
-          style: 'success'
         }
       ],
       [
@@ -2302,10 +2407,10 @@ function showBankSelectScreen(ctx, amount, currency = 'USD', oneXBetId, explicit
 }
 
 // Helper: Generate KHQR Card, Auto-Check & Notify Admin Group
-async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency = 'USD', explicitAmount = null, bank = 'aba') {
+async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency = 'USD', explicitAmount = null, bank = 'bakong') {
   const userId = ctx.from.id;
   const chatId = ctx.chat.id;
-  const username = ctx.from.username ? `@${ctx.from.username}` : 'គ្មាន';
+  const username = ctx.from.username ? `@${ctx.from.username}` : `ID: ${userId}`;
 
   let finalUsdAmount = explicitAmount !== null && explicitAmount !== undefined && !isNaN(Number(explicitAmount))
     ? parseFloat(Number(explicitAmount).toFixed(2))
@@ -2313,9 +2418,8 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
   let chargeAmount = finalUsdAmount;
 
   // 1. Show animated loading state
-  const isAba = String(bank).toLowerCase() === 'aba';
-  const bankName = isAba ? 'ABA Bank' : 'Bakong';
-  const loadingText = `${ANIM.REFRESH} <b>កំពុងដំណើរការបង្កើតកាត KHQR (${bankName}) ចំនួន ${finalUsdAmount.toFixed(2)} USD...</b>\n<i>${ANIM.HOURGLASS} សូមរង់ចាំមួយភ្លែត...</i>`;
+  const bankName = 'Bakong';
+  const loadingText = `${ANIM.REFRESH} <b>កំពុងដំណើរការបង្កើតកាត Bakong KHQR ចំនួន ${finalUsdAmount.toFixed(2)} USD...</b>\n<i>${ANIM.HOURGLASS} សូមរង់ចាំមួយភ្លែត...</i>`;
 
   await showScreen(ctx, {
     text: loadingText,
@@ -2323,7 +2427,7 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
   });
 
   try {
-    const data = await generateKHQR(chargeAmount, 'USD', bank);
+    const data = await generateKHQR(chargeAmount, 'USD', 'bakong');
 
     if (!data.success || !data.qrString) {
       throw new Error(data.error || 'Failed to generate KHQR');
@@ -2332,45 +2436,21 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
     const tranId = data.tranId;
     const expiresAt = Date.now() + 3 * 60 * 1000; // 3 minutes expiry (180 seconds)
 
-    const computedDeepLink = data.deepLink || (data.qrString ? `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}` : null);
-    const computedAndroidIntent = data.androidIntent || (data.qrString ? `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end` : null);
-
-    if (isAba) {
-      abaDeeplinks.set(tranId, {
-        tranId,
-        amount: data.amountFormatted || finalUsdAmount.toFixed(2),
-        qrString: data.qrString,
-        deepLink: computedDeepLink,
-        androidIntent: computedAndroidIntent,
-        expiresAt: Date.now() + 15 * 60 * 1000
-      });
-    }
-
-    // 2. Render authentic Bank KHQR Card: Bakong -> MAKO CAMBO, ABA -> MAKO H.T
-    const displayMerchant = isAba ? ADMIN_ABA_NAME : ADMIN_BAKONG_NAME;
+    // 2. Render authentic Bank KHQR Card: Bakong -> MAKO CAMBO
+    const displayMerchant = ADMIN_BAKONG_NAME;
 
     const cardBuffer = await createKhqrCard({
       merchantName: displayMerchant,
       amount: data.amountFormatted || finalUsdAmount.toFixed(2),
       currency: 'USD',
       qrString: data.qrString,
-      bank: isAba ? 'aba' : 'bakong'
+      bank: 'bakong'
     });
 
     const amountCaption = `<b>$${data.amountFormatted || finalUsdAmount.toFixed(2)} USD</b>`;
-    const bankHeader = isAba ? 'ABA PayWay' : 'Bakong KHQR';
-    const scanInstruction = isAba
-      ? 'ស្កេនជាមួយ ABA Mobile ឬគ្រប់ធនាគារទាំងអស់!'
-      : 'ស្កេនជាមួយ Bakong App, ABA Mobile ឬគ្រប់ធនាគារទាំងអស់!';
-
-    const bankLine = isAba
-      ? `${ANIM.ABA} <b>ABA : ${ADMIN_ABA_NAME}</b>`
-      : `${ANIM.BAKONG} <b>Bakong : ${ADMIN_BAKONG_NAME}</b>`;
-
-    const liveBaseUrl = (process.env.MINIAPP_URL && !process.env.MINIAPP_URL.includes('trycloudflare') && !process.env.MINIAPP_URL.includes('localhost'))
-      ? process.env.MINIAPP_URL
-      : 'https://makopay-bot.onrender.com';
-    const payAbaUrl = `${liveBaseUrl}/pay-aba?tranId=${encodeURIComponent(tranId)}&amount=${encodeURIComponent(data.amountFormatted || finalUsdAmount.toFixed(2))}&qr=${encodeURIComponent(data.qrString)}`;
+    const bankHeader = 'Bakong KHQR';
+    const scanInstruction = 'ស្កេនជាមួយ Bakong App ឬគ្រប់ធនាគារទាំងអស់!';
+    const bankLine = `${ANIM.BAKONG} <b>Bakong : ${ADMIN_BAKONG_NAME}</b>`;
 
     const caption =
       `${ANIM.MONEY} <b>វិក្កយបត្របង់ប្រាក់ ${bankHeader}</b>\n` +
@@ -2383,29 +2463,19 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
       `${ANIM.ID} <b>លេខវិក្កយបត្រ:</b> <code>${tranId}</code>\n` +
       `${ANIM.HOURGLASS} <b>សុពលភាព:</b> <code>3 នាទី</code>\n` +
       `━━━━━━━━━━━━━━━\n` +
-      (isAba ? `📲 <a href="${payAbaUrl}">👉 <b>ចុចទីនេះដើម្បីបើក ABA Mobile ផ្ទាល់</b></a>\n━━━━━━━━━━━━━━━\n` : '') +
       `${ANIM.PHONE} <i>${scanInstruction}</i>\n` +
       `${ANIM.REFRESH} <i>ប្រព័ន្ធត្រួតពិនិត្យស្វ័យប្រវត្តិ (Auto 24/7)...</i>`;
 
-    const buttons = [];
-    if (isAba) {
-      buttons.push([
+    const buttons = [
+      [
         {
-          text: 'បើកបង់ប្រាក់ក្នុង ABA Mobile',
-          url: payAbaUrl,
-          icon_custom_emoji_id: BTN_ICONS.ABA,
-          style: 'primary'
+          text: 'បោះបង់ (Cancel)',
+          callback_data: `cancel_pay_${tranId}`,
+          icon_custom_emoji_id: BTN_ICONS.CANCEL,
+          style: 'danger'
         }
-      ]);
-    }
-    buttons.push([
-      {
-        text: 'បោះបង់ (Cancel)',
-        callback_data: `cancel_pay_${tranId}`,
-        icon_custom_emoji_id: BTN_ICONS.CANCEL,
-        style: 'danger'
-      }
-    ]);
+      ]
+    ];
 
     const reply_markup = { inline_keyboard: buttons };
 
@@ -2556,7 +2626,7 @@ bot.action(/sel_bank_([0-9.]+)_([A-Z]+)_(.+)/, async (ctx) => {
   const rawAmount = parseFloat(ctx.match[1]);
   const oneXBetId = ctx.match[3];
   await ctx.answerCbQuery().catch(() => { });
-  return showBankSelectScreen(ctx, rawAmount, 'USD', oneXBetId, rawAmount);
+  return initiateKhqrPayment(ctx, rawAmount, oneXBetId, 'USD', rawAmount, 'bakong');
 });
 
 // Also support legacy gen_qr_
@@ -2564,16 +2634,15 @@ bot.action(/gen_qr_([0-9.]+)_([A-Z]+)_(.+)/, async (ctx) => {
   const rawAmount = parseFloat(ctx.match[1]);
   const oneXBetId = ctx.match[3];
   await ctx.answerCbQuery().catch(() => { });
-  return showBankSelectScreen(ctx, rawAmount, 'USD', oneXBetId, rawAmount);
+  return initiateKhqrPayment(ctx, rawAmount, oneXBetId, 'USD', rawAmount, 'bakong');
 });
 
-// User chose Bank (Bakong or ABA) -> Generate KHQR
+// User chose Bank (Bakong or legacy callback) -> Generate Bakong KHQR
 bot.action(/pay_bank_(bakong|aba)_([0-9.]+)_([A-Z]+)_(.+)/, async (ctx) => {
-  const bank = ctx.match[1];
   const rawAmount = parseFloat(ctx.match[2]);
   const oneXBetId = ctx.match[4];
   await ctx.answerCbQuery().catch(() => { });
-  return initiateKhqrPayment(ctx, rawAmount, oneXBetId, 'USD', rawAmount, bank);
+  return initiateKhqrPayment(ctx, rawAmount, oneXBetId, 'USD', rawAmount, 'bakong');
 });
 
 // Swap Payment Bank (Bakong <-> ABA)
@@ -2718,8 +2787,22 @@ bot.action(/adm_td_(.+)/, async (ctx) => {
       await bot.telegram.deleteMessage(targetChatId, waitMsgId).catch(() => { });
     }
 
+    const userSuccessMarkup = {
+      inline_keyboard: [
+        [
+          {
+            text: 'ទៅកាន់ Menu ចម្បង',
+            callback_data: 'back_main',
+            icon_custom_emoji_id: BTN_ICONS.BACK,
+            style: 'primary'
+          }
+        ]
+      ]
+    };
+
     const sent = await bot.telegram.sendMessage(targetChatId, userSuccessText, {
-      parse_mode: 'HTML'
+      parse_mode: 'HTML',
+      reply_markup: userSuccessMarkup
     }).catch(err => console.error('Failed to send success to user:', err.message));
 
     if (sent?.message_id) {
@@ -3234,6 +3317,30 @@ bot.action('hist_all', async (ctx) => {
   return showScreen(ctx, screen);
 });
 
+bot.action('admin_hist_search_1xbet', async (ctx) => {
+  const userId = ctx.from.id;
+  if (!isAdmin(userId)) {
+    return ctx.answerCbQuery('⚠️ មុខងារនេះសម្រាប់តែ Admin ប៉ុណ្ណោះ!', { show_alert: true });
+  }
+  userStates.set(userId, { state: 'AWAITING_ADMIN_SEARCH_1XBET_ID' });
+  await ctx.answerCbQuery().catch(() => { });
+  const screen = getAdminSearchScreen();
+  return showScreen(ctx, screen);
+});
+
+bot.command(['check', 'search', 'find'], async (ctx) => {
+  const userId = ctx.from.id;
+  if (!isAdmin(userId)) return;
+  const parts = ctx.message.text.trim().split(/\s+/);
+  if (parts.length > 1) {
+    const searchId = parts[1].trim();
+    return showAdminSearch1xBetHistory(ctx, searchId);
+  }
+  userStates.set(userId, { state: 'AWAITING_ADMIN_SEARCH_1XBET_ID' });
+  const screen = getAdminSearchScreen();
+  return showScreen(ctx, screen);
+});
+
 // Buying item handler
 bot.action(/buy_item_(.+)/, async (ctx) => {
   const user = getUser(ctx.from.id, ctx.from.first_name);
@@ -3286,7 +3393,12 @@ bot.on('text', async (ctx) => {
   // Clean up user's typed message immediately so chat stays neat
   await ctx.deleteMessage().catch(() => { });
 
-  // 1. Step 1 of Top-up: User enters 1xBet ID -> Check ID in App
+  // 0. Admin search history by 1xBet ID
+  if (userState?.state === 'AWAITING_ADMIN_SEARCH_1XBET_ID' && isAdmin(userId)) {
+    userStates.delete(userId);
+    const searchId = ctx.message.text.trim();
+    return showAdminSearch1xBetHistory(ctx, searchId);
+  }
   if (userState?.state === 'AWAITING_1XBET_ID' || userState?.state === 'AWAITING_MELBET_ID') {
     const oneXBetId = ctx.message.text.trim();
     if (!oneXBetId) return;
@@ -3325,13 +3437,13 @@ ${ANIM.BULB} <b>សូមចំណាំ៖</b>
     const usdAmount = Math.round(parseFloat(rawInput) * 100) / 100;
     const oneXBetId = userState?.oneXBetId || 'N/A';
 
-    if (isNaN(usdAmount) || usdAmount < 1 || usdAmount > 10000) {
+    if (isNaN(usdAmount) || usdAmount < 3 || usdAmount > 10000) {
       const errText =
         `${ANIM.WARN} <b>ចំនួនទឹកប្រាក់មិនត្រឹមត្រូវទេ!</b>\n` +
         `━━━━━━━━━━━━━━━\n` +
         `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${oneXBetId}</code>\n` +
-        `${ANIM.CROSS} <b>សូមបញ្ចូលទឹកប្រាក់ (Min: $1 - Max: $10000)!</b>\n` +
-        `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>1</code> , <code>3</code> , <code>3.50</code> ,\n` +
+        `${ANIM.CROSS} <b>សូមបញ្ចូលទឹកប្រាក់ចាប់ពី $3 ឡើងទៅ (Min: $3 - Max: $10000)!</b>\n` +
+        `${ANIM.BULB} <b>ឧទាហរណ៍:</b> <code>3</code> , <code>5</code> , <code>10</code> , <code>3.50</code> ,\n` +
         `━━━━━━━━━━━━━━━`;
       const reply_markup = {
         inline_keyboard: [
@@ -3345,7 +3457,7 @@ ${ANIM.BULB} <b>សូមចំណាំ៖</b>
     }
 
     userStates.delete(userId);
-    return showBankSelectScreen(ctx, usdAmount, 'USD', oneXBetId, usdAmount);
+    return initiateKhqrPayment(ctx, usdAmount, oneXBetId, 'USD', usdAmount, 'bakong');
   }
 
   // 3. User in withdrawal state -> direct to Admin
@@ -3658,32 +3770,17 @@ const server = http.createServer(async (req, res) => {
       const username = body.username || 'User';
       const name = body.name || 'Member';
 
-      if (isNaN(amount) || amount < 1 || amount > 10000) {
-        return sendJson(res, 400, { success: false, error: 'ចំនួនទឹកប្រាក់ត្រូវតែចាប់ពី $1.00 ឡើងទៅ (អតិបរមា: $10,000)' });
+      if (isNaN(amount) || amount < 3 || amount > 10000) {
+        return sendJson(res, 400, { success: false, error: 'ចំនួនទឹកប្រាក់ត្រូវតែចាប់ពី $3.00 ឡើងទៅ (អតិបរមា: $10,000)' });
       }
 
-      const data = await generateKHQR(amount, 'USD', bank);
+      const data = await generateKHQR(amount, 'USD', 'bakong');
       if (!data.success || !data.qrString) {
         return sendJson(res, 500, { success: false, error: data.error || 'Failed to generate KHQR' });
       }
 
       const tranId = data.tranId;
-      const isAba = String(bank).toLowerCase() === 'aba';
-      const displayMerchant = isAba ? (ADMIN_ABA_NAME || 'MAKO by H.T') : ADMIN_BAKONG_NAME;
-
-      const computedDeepLink = data.deepLink || (data.qrString ? `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}` : null);
-      const computedAndroidIntent = data.androidIntent || (data.qrString ? `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end` : null);
-
-      if (isAba) {
-        abaDeeplinks.set(tranId, {
-          tranId,
-          amount: data.amountFormatted || amount.toFixed(2),
-          qrString: data.qrString,
-          deepLink: computedDeepLink,
-          androidIntent: computedAndroidIntent,
-          expiresAt: Date.now() + 15 * 60 * 1000
-        });
-      }
+      const displayMerchant = ADMIN_BAKONG_NAME;
 
       // Save pending transaction with 3-minute live poller & expiry
       pendingTxs.set(tranId, {
@@ -3695,7 +3792,7 @@ const server = http.createServer(async (req, res) => {
         oneXBetId,
         username,
         name,
-        bank,
+        bank: 'bakong',
         md5: data.md5,
         tranId,
         token: data.token || null,
@@ -3703,8 +3800,8 @@ const server = http.createServer(async (req, res) => {
         stateRequestTime: data.stateRequestTime || null,
         deviceId: data.deviceId || null,
         qrString: data.qrString,
-        deepLink: computedDeepLink,
-        androidIntent: computedAndroidIntent,
+        deepLink: null,
+        androidIntent: null,
         expiresAt: Date.now() + 3 * 60 * 1000
       });
 
@@ -3721,9 +3818,9 @@ const server = http.createServer(async (req, res) => {
         qrDataUrl,
         amount: data.amountFormatted || amount.toFixed(2),
         currency: 'USD',
-        bank: data.bank || bank.toUpperCase(),
-        deepLink: computedDeepLink,
-        androidIntent: computedAndroidIntent,
+        bank: 'BAKONG',
+        deepLink: null,
+        androidIntent: null,
         merchantName: displayMerchant
       });
     } catch (err) {

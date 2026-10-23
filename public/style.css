@@ -812,9 +812,9 @@ body::before {
 }
 
 .bank-select-card.active {
-  background: rgba(37, 99, 235, 0.12);
-  border-color: #2563eb;
-  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.25);
+  background: rgba(226, 26, 26, 0.12);
+  border-color: #e21a1a;
+  box-shadow: 0 4px 18px rgba(226, 26, 26, 0.25);
 }
 
 .bank-card-icon-wrap {

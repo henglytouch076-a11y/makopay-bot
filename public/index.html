@@ -217,27 +217,10 @@
                 </div>
                 <div class="bank-card-text">
                   <div class="bank-title-row">
-                    <span class="bank-name">Bakong App</span>
-                    <span class="bank-tag-pill red">KHQR</span>
+                    <span class="bank-name">Bakong KHQR</span>
+                    <span class="bank-tag-pill red">Official</span>
                   </div>
-                  <span class="bank-hint">ស្កេនបានគ្រប់ធនាគារក្នុងស្រុកទាំងអស់</span>
-                </div>
-                <div class="bank-radio-circle">
-                  <svg viewBox="0 0 24 24" class="check-icon"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                </div>
-              </button>
-
-              <!-- ABA Real Logo from Gold Zone Media -->
-              <button type="button" class="bank-select-card" data-bank="aba">
-                <div class="bank-card-icon-wrap aba">
-                  <img src="assets/aba_icon.png" alt="ABA Bank" class="bank-img-logo" />
-                </div>
-                <div class="bank-card-text">
-                  <div class="bank-title-row">
-                    <span class="bank-name">ABA Bank</span>
-                    <span class="bank-tag-pill blue">PayWay</span>
-                  </div>
-                  <span class="bank-hint">ABA Mobile / ស្កេន KHQR</span>
+                  <span class="bank-hint">ស្កេនបានជាមួយ Bakong App និងគ្រប់ធនាគារក្នុងស្រុកទាំងអស់</span>
                 </div>
                 <div class="bank-radio-circle">
                   <svg viewBox="0 0 24 24" class="check-icon"><path fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -314,7 +297,7 @@
             </div>
 
             <!-- Authentic Khmer Bank Scan Instruction -->
-            <p id="khqrScanGuide" class="khqr-scan-guide">Scan with ABA Mobile, or other Mobile Banking App supporting KHQR</p>
+            <p id="khqrScanGuide" class="khqr-scan-guide">Scan with Bakong App or other Mobile Banking App supporting KHQR</p>
 
             <!-- Countdown Timer -->
             <div class="khqr-meta-box">
@@ -329,17 +312,6 @@
 
           <!-- Voucher Action Buttons -->
           <div class="voucher-actions-group">
-            <button type="button" id="btnOpenAbaApp" class="btn-aba-direct" style="display: none;">
-              <span class="btn-aba-icon-wrap">
-                <svg viewBox="0 0 24 24" class="btn-aba-svg" fill="currentColor">
-                  <path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
-                </svg>
-              </span>
-              <span class="btn-aba-text">បើកបង់ប្រាក់ក្នុង <b>ABA Mobile</b></span>
-              <svg viewBox="0 0 24 24" class="btn-aba-arrow" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="9 18 15 12 9 6"></polyline>
-              </svg>
-            </button>
 
             <button type="button" id="btnRegenQr" class="btn-primary-action" style="display: none;">
               <svg viewBox="0 0 24 24" class="btn-inline-svg"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -491,15 +463,22 @@
         
         <div class="clean-card">
           <div class="view-header">
-            <h2 class="view-title">ជំនួយ និងការណែនាំ (Help)</h2>
+            <h2 class="view-title">ជំនួយ និងរបៀបដាក់ប្រាក់ (Help & Guide)</h2>
           </div>
 
-          <div class="guide-segmented-bar">
-            <button type="button" class="guide-toggle-btn active" data-guide="topup">ដាក់ប្រាក់</button>
-            <button type="button" class="guide-toggle-btn" data-guide="withdraw">ដកប្រាក់</button>
+          <!-- Video Tutorial: How to Add Funds (howtoadfounf.MOV) -->
+          <div class="hero-image-wrap hero-video-wrap" style="margin-bottom: 16px;">
+            <video
+              id="guideAddFundsVideo"
+              class="hero-welcome-video"
+              controls
+              playsinline
+              preload="metadata"
+              src="howtoadfounf.MOV"
+            ></video>
           </div>
 
-          <!-- Top-Up Guide -->
+          <!-- Top-Up Guide Steps -->
           <div id="guideTopUpBlock" class="guide-text-block">
             <div class="guide-step">
               <span class="step-num">1</span>
@@ -511,26 +490,15 @@
             <div class="guide-step">
               <span class="step-num">2</span>
               <div>
-                <b>ជ្រើសរើសទឹកប្រាក់ & ធនាគារ:</b>
-                <p>រើសចំនួនទឹកប្រាក់ USD និងធនាគារ Bakong ឬ ABA។</p>
+                <b>ជ្រើសរើសទឹកប្រាក់ (Min: $3):</b>
+                <p>រើសចំនួនទឹកប្រាក់ចាប់ពី $3.00 ឡើងទៅជាមួយ Bakong KHQR។</p>
               </div>
             </div>
             <div class="guide-step">
               <span class="step-num">3</span>
               <div>
                 <b>ស្កេនទូទាត់:</b>
-                <p>ស្កេនកូដ KHQR ➔ ប្រព័ន្ធនឹង Add Funds ជូនអ្នកក្នុង 1-2 នាទី!</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Withdraw Guide -->
-          <div id="guideWithdrawBlock" class="guide-text-block" style="display: none;">
-            <div class="guide-step">
-              <span class="step-num">1</span>
-              <div>
-                <b>ទំនាក់ទំនង Admin ដើម្បីដកប្រាក់:</b>
-                <p>សូមចុច Username នេះឆាតទៅ Admin ដើម្បីដកប្រាក់ ( <a href="https://t.me/ma_ko168" target="_blank" style="color: #38bdf8; text-decoration: underline; font-weight: 700;">@ma_ko168</a> )</p>
+                <p>ស្កេនកូដ KHQR ជាមួយ Bakong App ឬគ្រប់ធនាគារ ➔ ប្រព័ន្ធនឹង Add Funds ជូនអ្នកក្នុង 1-2 នាទី!</p>
               </div>
             </div>
           </div>

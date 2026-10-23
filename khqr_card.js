@@ -7,26 +7,23 @@ const QRCode = require('qrcode');
  */
 async function createKhqrCard({
   merchantName = 'MAKO CAMBO',
-  amount = '1.00',
+  amount = '3.00',
   currency = 'USD',
   altAmount = null,
   qrString,
-  bank = 'aba'
+  bank = 'bakong'
 }) {
   const width = 500;
   const height = 750;
 
   const isKHR = String(currency).toUpperCase() === 'KHR';
   const currencyCode = isKHR ? 'KHR' : 'USD';
-  const isAba = String(bank).toLowerCase() === 'aba';
 
-  // Bank Specific Branding: ABA Blue (#005F82) vs Bakong Red (#E21A1A)
-  const headerColor = isAba ? '#005F82' : '#E21A1A';
-  const headerTitle = isAba ? 'ABA PAYWAY' : 'BAKONG KHQR';
-  const footerMain = isAba ? 'Scan to Pay with ABA Mobile' : 'Scan to Pay with Banking App';
-  const footerSub = isAba
-    ? 'ABA Mobile, Bakong, or other App supporting KHQR'
-    : 'Bakong, ABA Mobile, or other App supporting KHQR';
+  // Authentic Bakong KHQR Branding: Official NBC Bakong Red (#E21A1A)
+  const headerColor = '#E21A1A';
+  const headerTitle = 'BAKONG KHQR';
+  const footerMain = 'Scan to Pay with Banking App';
+  const footerSub = 'Bakong or any Mobile Banking App supporting KHQR';
 
   // Format amount cleanly
   let displayAmount = amount;
