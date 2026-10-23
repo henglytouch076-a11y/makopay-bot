@@ -460,6 +460,21 @@ function isAdmin(id) {
   return ADMIN_IDS.has(String(id));
 }
 
+function isAdminChatOrUser(ctx) {
+  if (!ctx) return false;
+  const senderId = ctx.from?.id ? String(ctx.from.id) : '';
+  if (isAdmin(senderId)) return true;
+  const chatId = ctx.chat?.id ? String(ctx.chat.id) : '';
+  if (
+    chatId === String(ADMIN_TOPUP_GROUP_ID) ||
+    chatId === String(ADMIN_GROUP_ID) ||
+    chatId === String(ADMIN_WITHDRAW_GROUP_ID)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 // In-memory Database & Sessions
 const usersDb = new Map();
 const USER_STATES_FILE_PATH = path.join(__dirname, 'user_states.json');
@@ -641,6 +656,29 @@ function updateHistoryStatus(id, newStatus) {
   }
 }
 
+function formatUserInfo(item = {}) {
+  const rawU = String(item.username || '').trim();
+  const isInvalidUsername = !rawU ||
+    rawU === 'គ្មាន' ||
+    rawU === '@គ្មាន' ||
+    rawU === 'User' ||
+    rawU.toLowerCase().includes('id:') ||
+    rawU.startsWith('@ID:');
+  const cleanUsername = isInvalidUsername ? '' : (rawU.startsWith('@') ? rawU : `@${rawU}`);
+  const customerName = escapeHtml(item.name || 'User');
+  const userIdStr = (item.userId && String(item.userId) !== '0' && String(item.userId) !== 'undefined')
+    ? String(item.userId).trim()
+    : '';
+
+  const customerText = cleanUsername
+    ? `${customerName} (${escapeHtml(cleanUsername)})`
+    : customerName;
+
+  const idCode = userIdStr ? `<code>${escapeHtml(userIdStr)}</code>` : '<code>N/A</code>';
+
+  return { customerText, idCode, userIdStr, cleanUsername, customerName };
+}
+
 function getHistoryForUser(userId, filter = 'today', isUserAdmin = false) {
   const todayKey = getCambodiaDateKey(new Date());
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -693,19 +731,19 @@ function getHistoryScreen(userId, filter = 'today', isUserAdmin = false) {
         text += `${ANIM.ONEXBET} <b>ID 1xBet:</b> <code>${item.oneXBetId || 'N/A'}</code>\n`;
         text += `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(item.amount || 0).toFixed(2)} USD</b>\n`;
         text += `${ANIM.CARD} <b>ធនាគារ:</b> <b>${item.bank ? item.bank.toUpperCase() : 'KHQR'}</b>\n`;
-        text += `${ANIM.RECEIPT} <b>វិក្កយបត្រ:</b> <b>${item.id}</b>\n`;
+        text += `${ANIM.RECEIPT} <b>វិក្កយបត្រ:</b> <code>${item.id}</code>\n`;
       } else {
         text += `${ANIM.SHIELD} <b>Code 4 ខ្ទង់:</b> <code>${item.code || 'N/A'}</code>\n`;
         text += `${ANIM.CARD} <b>ធនាគារ:</b> <b>${item.bank || 'KHQR'}</b>\n`;
         if (item.accountName) text += `👤 <b>ឈ្មោះ:</b> <b>${item.accountName}</b>\n`;
-        text += `${ANIM.RECEIPT} <b>Withdraw ID:</b> <b>${item.id}</b>\n`;
+        text += `${ANIM.RECEIPT} <b>Withdraw ID:</b> <code>${item.id}</code>\n`;
       }
       if (isUserAdmin && (item.name || item.userId)) {
-        const hasU = item.username && item.username !== 'គ្មាន' && item.username !== '@គ្មាន' && item.username !== 'User';
-        const userDisplay = hasU
-          ? (item.username.startsWith('@') ? item.username : `@${item.username}`)
-          : `ID: ${item.userId}`;
-        text += `${ANIM.USER} <b>អតិថិជន:</b> ${item.name || 'User'} (${userDisplay})\n`;
+        const userInfo = formatUserInfo(item);
+        text += `${ANIM.USER} <b>អតិថិជន:</b> ${userInfo.customerText}\n`;
+        if (userInfo.userIdStr) {
+          text += `${ANIM.INFO} <b>Telegram ID:</b> ${userInfo.idCode}\n`;
+        }
       }
       text += `⚡️ <b>ស្ថានភាព:</b> ${statusBadge}\n`;
       text += `🕒 <b>កាលបរិច្ឆេទ:</b> <b>${item.displayDate}</b>\n`;
@@ -743,7 +781,7 @@ function getHistoryScreen(userId, filter = 'today', isUserAdmin = false) {
   if (isUserAdmin) {
     keyboard.push([
       {
-        text: '🔍 ស្វែងរកតាម ID 1xBet',
+        text: '🔍 ស្វែងរកតាម ID 1xBet / Telegram ID',
         callback_data: 'admin_hist_search_1xbet',
         icon_custom_emoji_id: BTN_ICONS.DIAMOND,
         style: 'success'
@@ -767,11 +805,11 @@ function getHistoryScreen(userId, filter = 'today', isUserAdmin = false) {
 
 function getAdminSearchScreen() {
   const text =
-    `🔍 <b>ស្វែងរកប្រវត្តិប្រតិបត្តិការតាម ID 1xBet</b>\n` +
+    `🔍 <b>ស្វែងរកប្រវត្តិប្រតិបត្តិការតាម ID 1xBet ឬ Telegram ID</b>\n` +
     `━━━━━━━━━━━━━━━━━━━━━━\n` +
     `👑 <b>Admin Search Tool:</b>\n` +
-    `<i>សូមវាយបញ្ចូលលេខ ID 1xBet របស់ User ដើម្បីពិនិត្យមើលប្រវត្តិប្រតិបត្តិការ និងកាលបរិច្ឆេទទាំងអស់៖</i>\n\n` +
-    `💡 <b>ឧទាហរណ៍:</b> <code>1407771169</code>\n` +
+    `<i>សូមវាយបញ្ចូលលេខ ID 1xBet ឬ Telegram ID របស់ User ដើម្បីពិនិត្យមើលប្រវត្តិប្រតិបត្តិការទាំងអស់៖</i>\n\n` +
+    `💡 <b>ឧទាហរណ៍:</b> <code>1407771169</code> ឬ <code>1126206085</code>\n` +
     `━━━━━━━━━━━━━━━━━━━━━━`;
 
   const reply_markup = {
@@ -796,7 +834,231 @@ function getAdminSearchScreen() {
   return { text, reply_markup };
 }
 
+function buildGroupHistoryPayload(filter = 'today') {
+  syncExistingRequestsToHistory();
+  const list = getHistoryForUser(null, filter, true);
+
+  const filterTitle = filter === 'today'
+    ? '📅 ថ្ងៃនេះ (Today)'
+    : (filter === 'ytd' ? '📆 ម្សិលមិញ (Yesterday)' : '📋 ទាំងអស់ (All History)');
+
+  const now = new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' });
+
+  const completedTopups = list.filter(m => m.status === 'COMPLETED' && m.type === 'topup');
+  const completedTotal = completedTopups.reduce((sum, m) => sum + Number(m.amount || 0), 0);
+  const pendingCount = list.filter(m => m.status === 'PENDING').length;
+
+  let text =
+    `📊 <b>ប្រវត្តិប្រតិបត្តិការ Top-Up ក្នុង Group 👑</b>\n` +
+    `🔍 <b>តម្រង:</b> <code>${filterTitle}</code>\n` +
+    `💰 <b>សរុបបញ្ចូលជោគជ័យ:</b> <b>+$${completedTotal.toFixed(2)} USD</b> (${completedTopups.length} ជោគជ័យ${pendingCount > 0 ? `, ${pendingCount} កំពុងរង់ចាំ` : ''})\n` +
+    `🕒 <b>កាលបរិច្ឆេទ:</b> <code>${now}</code>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+  if (list.length === 0) {
+    text += `\n<i>⚠️ មិនទាន់មានប្រវត្តិប្រតិបត្តិការសម្រាប់ "${filterTitle}" ឡើយ!</i>\n`;
+  } else {
+    const displayList = list.slice(0, 8);
+    displayList.forEach((item, idx) => {
+      const isTopup = item.type === 'topup';
+      const typeIcon = isTopup ? ANIM.DEPOSIT : ANIM.WITHDRAW;
+      const typeName = isTopup ? 'បញ្ចូលប្រាក់ (Top-Up)' : 'ដកប្រាក់ (Withdraw)';
+
+      let statusBadge = '⏳ កំពុងរង់ចាំ (Pending)';
+      if (item.status === 'COMPLETED') statusBadge = '✅ ជោគជ័យ (Done)';
+      if (item.status === 'REJECTED') statusBadge = '❌ បានបដិសេធ (Cancelled)';
+
+      const userInfo = formatUserInfo(item);
+      const dateStr = item.displayDate || item.date || 'N/A';
+
+      text += `\n<b>#${idx + 1}. ${typeIcon} ${typeName}</b>\n` +
+        `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${escapeHtml(item.oneXBetId || 'N/A')}</code>\n` +
+        `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(item.amount || 0).toFixed(2)} USD</b>\n` +
+        `${ANIM.CARD} <b>ធនាគារ:</b> <b>${escapeHtml(item.bank ? item.bank.toUpperCase() : 'BAKONG KHQR')}</b>\n` +
+        `${ANIM.RECEIPT} <b>វិក្កយបត្រ:</b> <code>${escapeHtml(item.id)}</code>\n` +
+        `${ANIM.USER} <b>អតិថិជន:</b> ${userInfo.customerText}\n` +
+        `${ANIM.INFO} <b>Telegram ID:</b> ${userInfo.idCode}\n` +
+        `⚡️ <b>ស្ថានភាព:</b> ${statusBadge}\n` +
+        `🕒 <b>កាលបរិច្ឆេទ:</b> <b>${escapeHtml(dateStr)}</b>\n` +
+        `──────────────────`;
+    });
+
+    if (list.length > 8) {
+      text += `\n<i>... និងមានចំនួន ${list.length - 8} ប្រតិបត្តិការចាស់ៗទៀត</i>\n`;
+    }
+  }
+
+  const reply_markup = {
+    inline_keyboard: [
+      [
+        {
+          text: filter === 'today' ? '• 📅 ថ្ងៃនេះ •' : '📅 ថ្ងៃនេះ (Today)',
+          callback_data: 'grp_hist_today',
+          style: filter === 'today' ? 'success' : 'primary'
+        },
+        {
+          text: filter === 'ytd' ? '• 📆 ម្សិលមិញ •' : '📆 ម្សិលមិញ (YTD)',
+          callback_data: 'grp_hist_ytd',
+          style: filter === 'ytd' ? 'success' : 'primary'
+        },
+        {
+          text: filter === 'all' ? '• 📋 ទាំងអស់ •' : '📋 ទាំងអស់ (All)',
+          callback_data: 'grp_hist_all',
+          style: filter === 'all' ? 'success' : 'primary'
+        }
+      ],
+      [
+        {
+          text: '🔄 ធ្វើបច្ចុប្បន្នភាព',
+          callback_data: `grp_hist_${filter}`,
+          style: 'primary'
+        },
+        {
+          text: '🗑️ បិទ (Close)',
+          callback_data: 'grp_close',
+          style: 'danger'
+        }
+      ]
+    ]
+  };
+
+  return { text, reply_markup };
+}
+
+function buildGroupSearchPayload(searchId) {
+  syncExistingRequestsToHistory();
+  const cleaned = String(searchId || '').trim();
+  const now = new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' });
+
+  if (!cleaned) {
+    return {
+      text:
+        `🔍 <b>របៀបពិនិត្យក្នុង Group Admin Top-Up:</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `• វាយ <code>/check [ID]</code> (ឧទាហរណ៍៖ <code>/check 1360860931</code> ឬ <code>/check 1126206085</code>)\n` +
+        `• ឬគ្រាន់តែផ្ញើលេខ ID (6 ដល់ 18 ខ្ទង់) ចូលក្នុង Group ផ្ទាល់\n` +
+        `• វាយ <code>/history</code> ដើម្បីមើលប្រវត្តិ Top-Up ថ្ងៃនេះ\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━`,
+      reply_markup: {
+        inline_keyboard: [[{ text: '🗑️ បិទ (Close)', callback_data: 'grp_close', style: 'danger' }]]
+      }
+    };
+  }
+
+  const matches = transactionsHistory.filter(h => {
+    const oxId = String(h.oneXBetId || '').trim();
+    const tranId = String(h.id || '').trim();
+    const rawTranId = String(h.tranId || '').trim();
+    const uId = String(h.userId || '').trim();
+    return (oxId && oxId === cleaned) ||
+           (tranId && tranId === cleaned) ||
+           (rawTranId && rawTranId === cleaned) ||
+           (uId && uId === cleaned);
+  });
+
+  // Also check topupRequests directly in case not yet in history
+  for (const [tId, t] of topupRequests.entries()) {
+    const oxId = String(t.oneXBetId || '').trim();
+    const rawTranId = String(t.tranId || '').trim();
+    const uId = String(t.userId || '').trim();
+    if ((oxId && oxId === cleaned) || (String(tId) === cleaned) || (rawTranId && rawTranId === cleaned) || (uId && uId === cleaned)) {
+      if (!matches.some(m => String(m.id) === String(tId) || (rawTranId && String(m.id) === rawTranId))) {
+        matches.push({
+          id: t.tranId || tId,
+          type: 'topup',
+          userId: t.userId,
+          name: t.name,
+          username: t.username,
+          oneXBetId: t.oneXBetId,
+          amount: t.amount,
+          bank: t.bank,
+          status: 'PENDING',
+          timestamp: t.timestamp || Date.now(),
+          displayDate: t.date || new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })
+        });
+      }
+    }
+  }
+
+  matches.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+  let text =
+    `🔍 <b>លទ្ធផលស្វែងរកប្រវត្តិ ID:</b> <code>${escapeHtml(cleaned)}</code>\n` +
+    `👑 <b>Admin Group View:</b> <code>${matches.length} ប្រតិបត្តិការ</code>\n` +
+    `🕒 <b>កាលបរិច្ឆេទពិនិត្យ:</b> <code>${escapeHtml(now)}</code>\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+  if (matches.length === 0) {
+    text += `\n<i>⚠️ មិនមានប្រវត្តិប្រតិបត្តិការសម្រាប់ ID «<code>${escapeHtml(cleaned)}</code>» ឡើយ!</i>\n` +
+      `💡 <i>សូមពិនិត្យមើលលេខ ID 1xBet ឬ Telegram ID ឡើងវិញ ឬ ID នេះមិនទាន់មានប្រតិបត្តិការ។</i>\n`;
+  } else {
+    const completedTotal = matches
+      .filter(m => m.status === 'COMPLETED' && m.type === 'topup')
+      .reduce((sum, m) => sum + Number(m.amount || 0), 0);
+
+    text += `💰 <b>សរុបប្រាក់បញ្ចូលជោគជ័យ:</b> <b>+$${completedTotal.toFixed(2)} USD</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+    matches.slice(0, 8).forEach((item, idx) => {
+      const isTopup = item.type === 'topup';
+      const typeIcon = isTopup ? ANIM.DEPOSIT : ANIM.WITHDRAW;
+      const typeName = isTopup ? 'បញ្ចូលប្រាក់ (Top-Up)' : 'ដកប្រាក់ (Withdraw)';
+
+      let statusBadge = '⏳ កំពុងរង់ចាំ (Pending)';
+      if (item.status === 'COMPLETED') statusBadge = '✅ ជោគជ័យ (Done)';
+      if (item.status === 'REJECTED') statusBadge = '❌ បានបដិសេធ (Cancelled)';
+
+      const userInfo = formatUserInfo(item);
+      const dateStr = item.displayDate || item.date || 'N/A';
+
+      text += `\n<b>#${idx + 1}. ${typeIcon} ${typeName}</b>\n` +
+        `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${escapeHtml(item.oneXBetId || cleaned)}</code>\n` +
+        `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(item.amount || 0).toFixed(2)} USD</b>\n` +
+        `${ANIM.CARD} <b>ធនាគារ:</b> <b>${escapeHtml(item.bank ? item.bank.toUpperCase() : 'BAKONG KHQR')}</b>\n` +
+        `${ANIM.RECEIPT} <b>វិក្កយបត្រ:</b> <code>${escapeHtml(item.id)}</code>\n` +
+        `${ANIM.USER} <b>អតិថិជន:</b> ${userInfo.customerText}\n` +
+        `${ANIM.INFO} <b>Telegram ID:</b> ${userInfo.idCode}\n` +
+        `⚡️ <b>ស្ថានភាព:</b> ${statusBadge}\n` +
+        `🕒 <b>កាលបរិច្ឆេទ:</b> <b>${escapeHtml(dateStr)}</b>\n` +
+        `──────────────────`;
+    });
+
+    if (matches.length > 8) {
+      text += `\n<i>... និងមានចំនួន ${matches.length - 8} ប្រតិបត្តិការចាស់ៗទៀត</i>\n`;
+    }
+  }
+
+  const reply_markup = {
+    inline_keyboard: [
+      [
+        {
+          text: '🔄 ធ្វើបច្ចុប្បន្នភាព (Refresh)',
+          callback_data: `grp_chk_${cleaned}`,
+          style: 'primary'
+        },
+        {
+          text: '🗑️ បិទ (Close)',
+          callback_data: 'grp_close',
+          style: 'danger'
+        }
+      ]
+    ]
+  };
+
+  return { text, reply_markup };
+}
+
 async function showAdminSearch1xBetHistory(ctx, searchId) {
+  const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+  if (isGroup) {
+    const payload = buildGroupSearchPayload(searchId);
+    return await ctx.reply(payload.text, {
+      parse_mode: 'HTML',
+      reply_markup: payload.reply_markup,
+      reply_to_message_id: ctx.message?.message_id
+    }).catch(err => console.error("Error sending group search:", err.message));
+  }
+
   try {
     syncExistingRequestsToHistory();
     const cleaned = String(searchId || '').trim();
@@ -809,14 +1071,19 @@ async function showAdminSearch1xBetHistory(ctx, searchId) {
       const oxId = String(h.oneXBetId || '').trim();
       const tranId = String(h.id || '').trim();
       const rawTranId = String(h.tranId || '').trim();
-      return (oxId && oxId === cleaned) || (tranId && tranId === cleaned) || (rawTranId && rawTranId === cleaned);
+      const uId = String(h.userId || '').trim();
+      return (oxId && oxId === cleaned) ||
+             (tranId && tranId === cleaned) ||
+             (rawTranId && rawTranId === cleaned) ||
+             (uId && uId === cleaned);
     });
 
     // Also check topupRequests directly in case not yet in history
     for (const [tId, t] of topupRequests.entries()) {
       const oxId = String(t.oneXBetId || '').trim();
       const rawTranId = String(t.tranId || '').trim();
-      if ((oxId && oxId === cleaned) || (String(tId) === cleaned) || (rawTranId && rawTranId === cleaned)) {
+      const uId = String(t.userId || '').trim();
+      if ((oxId && oxId === cleaned) || (String(tId) === cleaned) || (rawTranId && rawTranId === cleaned) || (uId && uId === cleaned)) {
         if (!matches.some(m => String(m.id) === String(tId) || (rawTranId && String(m.id) === rawTranId))) {
           matches.push({
             id: t.tranId || tId,
@@ -840,14 +1107,14 @@ async function showAdminSearch1xBetHistory(ctx, searchId) {
     const now = new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' });
 
     let text =
-      `🔍 <b>លទ្ធផលស្វែងរកប្រវត្តិ ID 1xBet:</b> <code>${escapeHtml(cleaned)}</code>\n` +
+      `🔍 <b>លទ្ធផលស្វែងរកប្រវត្តិ ID:</b> <code>${escapeHtml(cleaned)}</code>\n` +
       `👑 <b>Admin View:</b> <code>${matches.length} ប្រតិបត្តិការ</code>\n` +
       `🕒 <b>កាលបរិច្ឆេទពិនិត្យ:</b> <code>${escapeHtml(now)}</code>\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n`;
 
     if (matches.length === 0) {
-      text += `\n<i>⚠️ មិនមានប្រវត្តិប្រតិបត្តិការសម្រាប់ ID 1xBet «<code>${escapeHtml(cleaned)}</code>» ឡើយ!</i>\n` +
-        `💡 <i>សូមពិនិត្យមើលលេខ ID 1xBet ឡើងវិញ ឬ ID នេះមិនទាន់មានប្រតិបត្តិការ។</i>\n`;
+      text += `\n<i>⚠️ មិនមានប្រវត្តិប្រតិបត្តិការសម្រាប់ ID «<code>${escapeHtml(cleaned)}</code>» ឡើយ!</i>\n` +
+        `💡 <i>សូមពិនិត្យមើលលេខ ID 1xBet ឬ Telegram ID ឡើងវិញ ឬ ID នេះមិនទាន់មានប្រតិបត្តិការ។</i>\n`;
     } else {
       const completedTotal = matches
         .filter(m => m.status === 'COMPLETED' && m.type === 'topup')
@@ -865,19 +1132,16 @@ async function showAdminSearch1xBetHistory(ctx, searchId) {
         if (item.status === 'COMPLETED') statusBadge = '✅ ជោគជ័យ (Done)';
         if (item.status === 'REJECTED') statusBadge = '❌ បានបដិសេធ (Cancelled)';
 
-        const hasU = item.username && item.username !== 'គ្មាន' && item.username !== '@គ្មាន' && item.username !== 'User';
-        const userDisplay = hasU
-          ? (item.username.startsWith('@') ? item.username : `@${item.username}`)
-          : `ID: ${item.userId}`;
-
+        const userInfo = formatUserInfo(item);
         const dateStr = item.displayDate || item.date || 'N/A';
 
         text += `\n<b>#${idx + 1}. ${typeIcon} ${typeName}</b>\n` +
           `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${escapeHtml(item.oneXBetId || cleaned)}</code>\n` +
           `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(item.amount || 0).toFixed(2)} USD</b>\n` +
           `${ANIM.CARD} <b>ធនាគារ:</b> <b>${escapeHtml(item.bank ? item.bank.toUpperCase() : 'BAKONG KHQR')}</b>\n` +
-          `${ANIM.USER} <b>អតិថិជន:</b> ${escapeHtml(item.name || 'User')} (${escapeHtml(userDisplay)})\n` +
           `${ANIM.RECEIPT} <b>វិក្កយបត្រ:</b> <code>${escapeHtml(item.id)}</code>\n` +
+          `${ANIM.USER} <b>អតិថិជន:</b> ${userInfo.customerText}\n` +
+          `${ANIM.INFO} <b>Telegram ID:</b> ${userInfo.idCode}\n` +
           `⚡️ <b>ស្ថានភាព:</b> ${statusBadge}\n` +
           `🕒 <b>កាលបរិច្ឆេទ:</b> <b>${escapeHtml(dateStr)}</b>\n` +
           `──────────────────`;
@@ -1219,10 +1483,11 @@ async function processSuccessfulTopup(tranId) {
   }
 
   // 6. Notify Admin Top-Up Group ONCE ONLY (Image 1 Format)
-  const hasUsername = tx.username && tx.username !== 'គ្មាន' && tx.username !== '@គ្មាន' && tx.username !== 'User';
-  const userHandle = hasUsername
-    ? ` (${tx.username.startsWith('@') ? tx.username : `@${tx.username}`})`
-    : ` (ID: ${tx.userId})`;
+  const userInfo = formatUserInfo({
+    username: tx.username,
+    name: user.name || 'User',
+    userId: tx.userId
+  });
 
   const hiddenWaitLink = sentSuccess?.message_id
     ? `<a href="tg://waitId/${sentSuccess.message_id}">&#8203;</a>`
@@ -1235,7 +1500,7 @@ async function processSuccessfulTopup(tranId) {
     `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${tx.oneXBetId}</code>\n` +
     `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${tx.usdAmount.toFixed(2)} USD</b>\n` +
     `━━━━━━━━━━━━━━━\n` +
-    `${ANIM.CROWN} <b>អតិថិជន:</b> <a href="tg://user?id=${tx.userId}">${user.name || 'User'}</a>${userHandle}\n` +
+    `${ANIM.CROWN} <b>អតិថិជន:</b> <a href="tg://user?id=${tx.userId}">${userInfo.customerName}</a>${userInfo.cleanUsername ? ` (${userInfo.cleanUsername})` : ''}\n` +
     `${ANIM.INFO} <b>Telegram ID:</b> <code>${tx.userId}</code>\n` +
     `${ANIM.RECEIPT} <b>លេខវិក្កយបត្រ:</b> <code>${tx.tranId}</code>\n` +
     `<b>កាលបរិច្ឆេទ:</b> <code>${new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</code>`;
@@ -1254,6 +1519,14 @@ async function processSuccessfulTopup(tranId) {
           callback_data: `adm_tc_${tx.tranId}`,
           icon_custom_emoji_id: BTN_ICONS.CANCEL,
           style: 'danger'
+        }
+      ],
+      [
+        {
+          text: `🔍 ពិនិត្យប្រវត្តិ (${tx.oneXBetId})`,
+          callback_data: `grp_chk_${tx.oneXBetId}`,
+          icon_custom_emoji_id: BTN_ICONS.DIAMOND,
+          style: 'primary'
         }
       ]
     ]
@@ -2521,7 +2794,7 @@ function showBankSelectScreen(ctx, amount, currency = 'USD', oneXBetId, explicit
 async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency = 'USD', explicitAmount = null, bank = 'bakong') {
   const userId = ctx.from.id;
   const chatId = ctx.chat.id;
-  const username = ctx.from.username ? `@${ctx.from.username}` : `ID: ${userId}`;
+  const username = ctx.from.username ? `@${ctx.from.username}` : '';
 
   let finalUsdAmount = explicitAmount !== null && explicitAmount !== undefined && !isNaN(Number(explicitAmount))
     ? parseFloat(Number(explicitAmount).toFixed(2))
@@ -3186,7 +3459,7 @@ bot.action('wd_confirm_submit', async (ctx) => {
 
   const withdrawId = 'WD' + Date.now().toString().slice(-6);
   const user = getUser(userId, ctx.from.first_name);
-  const username = ctx.from.username ? `@${ctx.from.username}` : 'គ្មាន';
+  const username = ctx.from.username ? `@${ctx.from.username}` : '';
 
   // 1. Tell user: request submitted
   const userText =
@@ -3252,7 +3525,7 @@ bot.action('wd_confirm_submit', async (ctx) => {
     `${ANIM.SIREN} <b>សំណើដកប្រាក់ថ្មី ( New )</b>\n\n` +
     `${ANIM.SHIELD} <b>Code 4 ខ្ទង់:</b> <code>${code}</code>\n` +
     `━━━━━━━━━━━━━━━━━\n` +
-    `${ANIM.CROWN} <b>អតិថិជន:</b> <a href="tg://user?id=${userId}">${user.name}</a> (${username})\n` +
+    `${ANIM.CROWN} <b>អតិថិជន:</b> <a href="tg://user?id=${userId}">${escapeHtml(user.name || 'User')}</a>${username ? ` (${escapeHtml(username)})` : ''}\n` +
     `${ANIM.ID} <b>Telegram ID:</b> <code>${userId}</code>\n` +
     `${ANIM.RECEIPT} <b>Withdraw ID:</b> <code>${withdrawId}</code>\n` +
     `${ANIM.CARD} <b>ធនាគារ:</b> <code>${khqr.bankName || 'Bakong KHQR'}</code>\n` +
@@ -3397,7 +3670,17 @@ bot.action('wd_back_verify', async (ctx) => {
 
 
 // Interactive Transactions History (Top-up & Withdraw)
-bot.command(['history', 'h'], async (ctx) => {
+bot.command(['history', 'h', 'topup', 'hist'], async (ctx) => {
+  const isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
+  if (isGroup) {
+    if (!isAdminChatOrUser(ctx)) return;
+    const payload = buildGroupHistoryPayload('today');
+    return await ctx.reply(payload.text, {
+      parse_mode: 'HTML',
+      reply_markup: payload.reply_markup,
+      reply_to_message_id: ctx.message?.message_id
+    }).catch(err => console.error("Error sending group history:", err.message));
+  }
   userStates.delete(ctx.from.id);
   const screen = getHistoryScreen(ctx.from.id, 'today', isAdmin(ctx.from.id));
   return showScreen(ctx, screen);
@@ -3439,7 +3722,75 @@ bot.action('admin_hist_search_1xbet', async (ctx) => {
   return showScreen(ctx, screen);
 });
 
+// Group Admin Callbacks for History & Search
+bot.action(/^grp_hist_(today|ytd|all)$/, async (ctx) => {
+  if (!isAdminChatOrUser(ctx)) {
+    return ctx.answerCbQuery('⚠️ សម្រាប់តែ Admin ប៉ុណ្ណោះ!', { show_alert: true }).catch(() => {});
+  }
+  const filter = ctx.match[1];
+  await ctx.answerCbQuery().catch(() => {});
+  const payload = buildGroupHistoryPayload(filter);
+  await ctx.editMessageText(payload.text, {
+    parse_mode: 'HTML',
+    reply_markup: payload.reply_markup
+  }).catch(() => {});
+});
+
+bot.action(/^grp_chk_(.+)$/, async (ctx) => {
+  if (!isAdminChatOrUser(ctx)) {
+    return ctx.answerCbQuery('⚠️ សម្រាប់តែ Admin ប៉ុណ្ណោះ!', { show_alert: true }).catch(() => {});
+  }
+  const searchId = ctx.match[1];
+  await ctx.answerCbQuery().catch(() => {});
+  const payload = buildGroupSearchPayload(searchId);
+  try {
+    await ctx.editMessageText(payload.text, {
+      parse_mode: 'HTML',
+      reply_markup: payload.reply_markup
+    });
+  } catch (err) {
+    // If cannot edit (e.g. photo caption or top-up alert message), reply to it
+    await ctx.reply(payload.text, {
+      parse_mode: 'HTML',
+      reply_markup: payload.reply_markup,
+      reply_to_message_id: ctx.callbackQuery?.message?.message_id
+    }).catch(() => {});
+  }
+});
+
+bot.action('grp_close', async (ctx) => {
+  if (!isAdminChatOrUser(ctx)) {
+    return ctx.answerCbQuery('⚠️ សម្រាប់តែ Admin ប៉ុណ្ណោះ!', { show_alert: true }).catch(() => {});
+  }
+  await ctx.answerCbQuery().catch(() => {});
+  await ctx.deleteMessage().catch(() => {});
+});
+
 bot.command(['check', 'search', 'find'], async (ctx) => {
+  const isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
+  if (isGroup) {
+    if (!isAdminChatOrUser(ctx)) return;
+    const parts = ctx.message.text.trim().split(/\s+/);
+    if (parts.length > 1) {
+      const searchId = parts[1].trim();
+      const payload = buildGroupSearchPayload(searchId);
+      return await ctx.reply(payload.text, {
+        parse_mode: 'HTML',
+        reply_markup: payload.reply_markup,
+        reply_to_message_id: ctx.message?.message_id
+      }).catch(err => console.error("Error sending group search:", err.message));
+    }
+    return await ctx.reply(
+      `🔍 <b>របៀបពិនិត្យក្នុង Group Admin Top-Up:</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `• វាយ <code>/check [ID]</code> (ឧទាហរណ៍៖ <code>/check 1360860931</code> ឬ <code>/check 1126206085</code>)\n` +
+      `• ឬគ្រាន់តែផ្ញើលេខ ID (6 ដល់ 18 ខ្ទង់) ចូលក្នុង Group ផ្ទាល់\n` +
+      `• វាយ <code>/history</code> ដើម្បីមើលប្រវត្តិ Top-Up ថ្ងៃនេះ\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+    ).catch(() => {});
+  }
+
   const userId = ctx.from.id;
   if (!isAdmin(userId)) return;
   const parts = ctx.message.text.trim().split(/\s+/);
@@ -3498,17 +3849,71 @@ bot.on('photo', async (ctx) => {
 });
 
 bot.on('text', async (ctx) => {
+  const isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
+  const textInput = (ctx.message?.text || '').trim();
+
+  // 1. Group Chat Handling (Admin Top-Up Group or any Admin Group)
+  if (isGroup) {
+    if (!isAdminChatOrUser(ctx)) return;
+
+    // Check if message is a history command
+    if (/^(?:\/history|\/hist|\/h|\/topup|history|hist|topup)$/i.test(textInput)) {
+      const payload = buildGroupHistoryPayload('today');
+      return await ctx.reply(payload.text, {
+        parse_mode: 'HTML',
+        reply_markup: payload.reply_markup,
+        reply_to_message_id: ctx.message?.message_id
+      }).catch(err => console.error("Error sending group history:", err.message));
+    }
+
+    // Check if message is a check command
+    const cmdMatch = textInput.match(/^(?:\/check|\/search|\/find|#check|#search|check|search)\s*(\d+)?$/i);
+    if (cmdMatch) {
+      if (cmdMatch[1]) {
+        const payload = buildGroupSearchPayload(cmdMatch[1]);
+        return await ctx.reply(payload.text, {
+          parse_mode: 'HTML',
+          reply_markup: payload.reply_markup,
+          reply_to_message_id: ctx.message?.message_id
+        }).catch(err => console.error("Error sending group search:", err.message));
+      } else {
+        return await ctx.reply(
+          `🔍 <b>របៀបពិនិត្យក្នុង Group Admin Top-Up:</b>\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `• វាយ <code>/check [ID]</code> (ឧទាហរណ៍៖ <code>/check 1360860931</code> ឬ <code>/check 1126206085</code>)\n` +
+          `• ឬគ្រាន់តែផ្ញើលេខ ID (6 ដល់ 18 ខ្ទង់) ចូលក្នុង Group ផ្ទាល់\n` +
+          `• វាយ <code>/history</code> ដើម្បីមើលប្រវត្តិ Top-Up ថ្ងៃនេះ\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━`,
+          { parse_mode: 'HTML', reply_to_message_id: ctx.message?.message_id }
+        ).catch(() => {});
+      }
+    }
+
+    // Check if message is a direct numeric ID (e.g. 1360860931 or 1126206085)
+    if (/^\d{6,18}$/.test(textInput)) {
+      const payload = buildGroupSearchPayload(textInput);
+      return await ctx.reply(payload.text, {
+        parse_mode: 'HTML',
+        reply_markup: payload.reply_markup,
+        reply_to_message_id: ctx.message?.message_id
+      }).catch(err => console.error("Error sending group search by direct ID:", err.message));
+    }
+
+    // Normal text chatter in group: do not delete or interfere
+    return;
+  }
+
+  // 2. Private DM Chat Handling
   const userId = ctx.from.id;
   const userState = userStates.get(userId);
-  const textInput = (ctx.message?.text || '').trim();
 
   // Clean up user's typed message immediately so chat stays neat
   await ctx.deleteMessage().catch(() => { });
 
-  // 0. Admin search history by 1xBet ID
+  // 0. Admin search history by 1xBet ID or Telegram ID
   const isSearchState = userState?.state === 'AWAITING_ADMIN_SEARCH_1XBET_ID';
   const isAdminUser = isAdmin(userId);
-  const isNumericId = /^\d{6,11}$/.test(textInput);
+  const isNumericId = /^\d{6,18}$/.test(textInput);
   const isSearchCmd = /^(?:\/check|\/search|\/find|#check|#search)\s*(\d+)?$/i.test(textInput);
 
   if (isSearchState || (isAdminUser && isNumericId) || (isAdminUser && isSearchCmd)) {
@@ -4118,7 +4523,7 @@ const server = http.createServer(async (req, res) => {
         `${ANIM.SIREN} <b>សំណើដកប្រាក់ថ្មី ( New )</b>\n\n` +
         `${ANIM.SHIELD} <b>Code 4 ខ្ទង់:</b> <code>${code}</code>\n` +
         `━━━━━━━━━━━━━━━━━\n` +
-        `${ANIM.CROWN} <b>អតិថិជន:</b> <a href="tg://user?id=${userId}">${name}</a> (${username})\n` +
+        `${ANIM.CROWN} <b>អតិថិជន:</b> <a href="tg://user?id=${userId}">${escapeHtml(name || 'User')}</a>${username && username !== 'User' && username !== 'គ្មាន' ? ` (${escapeHtml(username)})` : ''}\n` +
         `${ANIM.ID} <b>Telegram ID:</b> <code>${userId}</code>\n` +
         `${ANIM.RECEIPT} <b>Withdraw ID:</b> <code>${withdrawId}</code>\n` +
         `${ANIM.CARD} <b>ធនាគារ:</b> <code>${khqr.bankName || 'Bakong KHQR'}</code>\n` +
