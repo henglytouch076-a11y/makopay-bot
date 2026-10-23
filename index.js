@@ -3217,6 +3217,12 @@ bot.action('wd_back_verify', async (ctx) => {
 
 
 // Interactive Transactions History (Top-up & Withdraw)
+bot.command(['history', 'h'], async (ctx) => {
+  userStates.delete(ctx.from.id);
+  const screen = getHistoryScreen(ctx.from.id, 'today', isAdmin(ctx.from.id));
+  return showScreen(ctx, screen);
+});
+
 bot.action('menu_history', async (ctx) => {
   userStates.delete(ctx.from.id);
   await ctx.answerCbQuery().catch(() => { });
