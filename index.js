@@ -613,10 +613,13 @@ function getHistoryScreen(userId, filter = 'today', isUserAdmin = false) {
 
   const roleTitle = isUserAdmin ? ' 👑 (Admin View)' : '';
 
+  const now = new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' });
+
   let text =
     `${ANIM.CHART} <b>ប្រវត្តិប្រតិបត្តិការ (TRANSACTIONS HISTORY)${roleTitle}</b>\n` +
     `🔍 <b>តម្រង:</b> <code>${filterTitle}</code>\n` +
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    `🕒 <b>កាលបរិច្ឆេទ:</b> <code>${now}</code>\n` +
+    `━━━━━━━━━━━━━━━\n`;
 
   if (list.length === 0) {
     text += `\n<i>${ANIM.WARN} មិនមានប្រវត្តិប្រតិបត្តិការសម្រាប់ "${filterTitle}" ឡើយ!</i>\n`;
@@ -656,7 +659,7 @@ function getHistoryScreen(userId, filter = 'today', isUserAdmin = false) {
     }
   }
 
-  text += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+  text += `\n━━━━━━━━━━━━━━━\n` +
     `💡 <i>ជ្រើសរើសប៊ូតុងខាងក្រោមដើម្បីពិនិត្យមើលតាមកាលបរិច្ឆេទ៖</i>`;
 
   const reply_markup = {
@@ -676,20 +679,6 @@ function getHistoryScreen(userId, filter = 'today', isUserAdmin = false) {
           text: filter === 'all' ? '• 📋 ទាំងអស់ •' : '📋 ទាំងអស់ (All)',
           callback_data: 'hist_all',
           style: filter === 'all' ? 'success' : 'primary'
-        }
-      ],
-      [
-        {
-          text: 'ដាក់ប្រាក់ (Topup)',
-          callback_data: 'menu_topup',
-          icon_custom_emoji_id: BTN_ICONS.DEPOSIT,
-          style: 'success'
-        },
-        {
-          text: 'ដកប្រាក់ (Withdraw)',
-          callback_data: 'menu_withdraw',
-          icon_custom_emoji_id: BTN_ICONS.WITHDRAW,
-          style: 'primary'
         }
       ],
       [
