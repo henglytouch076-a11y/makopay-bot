@@ -7,6 +7,16 @@ const sharp = require('sharp');
 const jsQR = require('jsqr');
 const { createKhqrCard } = require('./khqr_card');
 
+// Helper: Safely escape HTML characters for Telegram HTML messages
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 // Guide & Welcome Videos Configuration
 function resolveVideoPath(...names) {
   for (const name of names) {
@@ -14,6 +24,8 @@ function resolveVideoPath(...names) {
     for (const ext of exts) {
       const p = path.join(__dirname, `${name}${ext}`);
       if (fs.existsSync(p)) return p;
+      const pubP = path.join(__dirname, 'public', `${name}${ext}`);
+      if (fs.existsSync(pubP)) return pubP;
     }
   }
   return null;
@@ -57,7 +69,7 @@ function getLogoPhoto() {
 let cachedAddFundsVideoFileId = process.env.ADDFUNDS_VIDEO_FILE_ID || mediaCache.addFundsVideoFileId || null;
 function getAddFundsVideo() {
   if (cachedAddFundsVideoFileId) return cachedAddFundsVideoFileId;
-  const filePath = resolveVideoPath('howtoadfounf', 'howtoadfound', 'howtoaddfunds', 'howtoaddfound', 'addfound', 'addfunds', 'topup');
+  const filePath = resolveVideoPath('newvideoadfound', 'newvideoaddfound', 'howtoadfounf', 'howtoadfound', 'howtoaddfunds', 'howtoaddfound', 'addfound', 'addfunds', 'topup');
   return filePath ? { source: filePath } : null;
 }
 
@@ -450,7 +462,53 @@ function isAdmin(id) {
 
 // In-memory Database & Sessions
 const usersDb = new Map();
-const userStates = new Map(); // tracks user input modes (e.g., custom amount, broadcast)
+const USER_STATES_FILE_PATH = path.join(__dirname, 'user_states.json');
+const _rawUserStates = new Map();
+function loadUserStatesFromDisk() {
+  try {
+    if (fs.existsSync(USER_STATES_FILE_PATH)) {
+      const data = JSON.parse(fs.readFileSync(USER_STATES_FILE_PATH, 'utf-8'));
+      for (const [k, v] of Object.entries(data)) {
+        _rawUserStates.set(String(k), v);
+      }
+    }
+  } catch (_) {}
+}
+function saveUserStatesToDisk() {
+  try {
+    const obj = {};
+    for (const [k, v] of _rawUserStates.entries()) {
+      obj[k] = v;
+    }
+    fs.writeFileSync(USER_STATES_FILE_PATH, JSON.stringify(obj, null, 2), 'utf-8');
+  } catch (_) {}
+}
+loadUserStatesFromDisk();
+
+const userStates = {
+  get(key) {
+    if (!key) return undefined;
+    return _rawUserStates.get(String(key));
+  },
+  set(key, val) {
+    if (!key) return;
+    _rawUserStates.set(String(key), val);
+    saveUserStatesToDisk();
+  },
+  delete(key) {
+    if (!key) return;
+    _rawUserStates.delete(String(key));
+    saveUserStatesToDisk();
+  },
+  has(key) {
+    if (!key) return false;
+    return _rawUserStates.has(String(key));
+  },
+  clear() {
+    _rawUserStates.clear();
+    saveUserStatesToDisk();
+  }
+};
 const pendingTxs = new Map(); // tracks active QR payments & countdown timers
 const userActiveMsgs = new Map(); // tracks last active bot message id to delete & replace cleanly
 const topupRequests = new Map(); // tracks completed payments waiting for admin to add funds
@@ -738,94 +796,134 @@ function getAdminSearchScreen() {
   return { text, reply_markup };
 }
 
-function showAdminSearch1xBetHistory(ctx, searchId) {
-  syncExistingRequestsToHistory();
-  const cleaned = String(searchId || '').trim();
-  const matches = transactionsHistory.filter(h => {
-    const oxId = String(h.oneXBetId || '').trim();
-    const tranId = String(h.id || '').trim();
-    return (oxId && oxId === cleaned) || (tranId && tranId === cleaned);
-  });
+async function showAdminSearch1xBetHistory(ctx, searchId) {
+  try {
+    syncExistingRequestsToHistory();
+    const cleaned = String(searchId || '').trim();
+    if (!cleaned) {
+      const screen = getAdminSearchScreen();
+      return await showScreen(ctx, screen);
+    }
 
-  const now = new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' });
-
-  let text =
-    `🔍 <b>លទ្ធផលស្វែងរកប្រវត្តិ ID 1xBet:</b> <code>${cleaned}</code>\n` +
-    `👑 <b>Admin View:</b> <code>${matches.length} ប្រតិបត្តិការ</code>\n` +
-    `🕒 <b>កាលបរិច្ឆេទពិនិត្យ:</b> <code>${now}</code>\n` +
-    `━━━━━━━━━━━━━━━━━━━━━━\n`;
-
-  if (matches.length === 0) {
-    text += `\n<i>⚠️ មិនមានប្រវត្តិប្រតិបត្តិការសម្រាប់ ID 1xBet «<code>${cleaned}</code>» ឡើយ!</i>\n` +
-      `💡 <i>សូមពិនិត្យមើលលេខ ID 1xBet ឡើងវិញ ឬ ID នេះមិនទាន់មានប្រតិបត្តិការ។</i>\n`;
-  } else {
-    const completedTotal = matches
-      .filter(m => m.status === 'COMPLETED' && m.type === 'topup')
-      .reduce((sum, m) => sum + Number(m.amount || 0), 0);
-
-    text += `💰 <b>សរុបប្រាក់បញ្ចូលជោគជ័យ:</b> <b>+$${completedTotal.toFixed(2)} USD</b>\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━\n`;
-
-    matches.slice(0, 15).forEach((item, idx) => {
-      const isTopup = item.type === 'topup';
-      const typeIcon = isTopup ? ANIM.DEPOSIT : ANIM.WITHDRAW;
-      const typeName = isTopup ? 'បញ្ចូលប្រាក់ (Top-Up)' : 'ដកប្រាក់ (Withdraw)';
-
-      let statusBadge = '⏳ កំពុងរង់ចាំ (Pending)';
-      if (item.status === 'COMPLETED') statusBadge = '✅ ជោគជ័យ (Done)';
-      if (item.status === 'REJECTED') statusBadge = '❌ បានបដិសេធ (Cancelled)';
-
-      const hasU = item.username && item.username !== 'គ្មាន' && item.username !== '@គ្មាន' && item.username !== 'User';
-      const userDisplay = hasU
-        ? (item.username.startsWith('@') ? item.username : `@${item.username}`)
-        : `ID: ${item.userId}`;
-
-      const dateStr = item.displayDate || item.date || 'N/A';
-
-      text += `\n<b>#${idx + 1}. ${typeIcon} ${typeName}</b>\n` +
-        `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${item.oneXBetId || cleaned}</code>\n` +
-        `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(item.amount || 0).toFixed(2)} USD</b>\n` +
-        `${ANIM.CARD} <b>ធនាគារ:</b> <b>${item.bank ? item.bank.toUpperCase() : 'BAKONG KHQR'}</b>\n` +
-        `${ANIM.USER} <b>អតិថិជន:</b> ${item.name || 'User'} (${userDisplay})\n` +
-        `${ANIM.RECEIPT} <b>វិក្កយបត្រ:</b> <code>${item.id}</code>\n` +
-        `⚡️ <b>ស្ថានភាព:</b> ${statusBadge}\n` +
-        `🕒 <b>កាលបរិច្ឆេទ:</b> <b>${dateStr}</b>\n` +
-        `──────────────────`;
+    const matches = transactionsHistory.filter(h => {
+      const oxId = String(h.oneXBetId || '').trim();
+      const tranId = String(h.id || '').trim();
+      const rawTranId = String(h.tranId || '').trim();
+      return (oxId && oxId === cleaned) || (tranId && tranId === cleaned) || (rawTranId && rawTranId === cleaned);
     });
 
-    if (matches.length > 15) {
-      text += `\n<i>... និងមានចំនួន ${matches.length - 15} ប្រតិបត្តិការចាស់ៗទៀត</i>\n`;
+    // Also check topupRequests directly in case not yet in history
+    for (const [tId, t] of topupRequests.entries()) {
+      const oxId = String(t.oneXBetId || '').trim();
+      const rawTranId = String(t.tranId || '').trim();
+      if ((oxId && oxId === cleaned) || (String(tId) === cleaned) || (rawTranId && rawTranId === cleaned)) {
+        if (!matches.some(m => String(m.id) === String(tId) || (rawTranId && String(m.id) === rawTranId))) {
+          matches.push({
+            id: t.tranId || tId,
+            type: 'topup',
+            userId: t.userId,
+            name: t.name,
+            username: t.username,
+            oneXBetId: t.oneXBetId,
+            amount: t.amount,
+            bank: t.bank,
+            status: 'PENDING',
+            timestamp: t.timestamp || Date.now(),
+            displayDate: t.date || new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })
+          });
+        }
+      }
     }
-  }
 
-  const reply_markup = {
-    inline_keyboard: [
-      [
-        {
-          text: '🔍 ស្វែងរក ID ផ្សេងទៀត',
-          callback_data: 'admin_hist_search_1xbet',
-          icon_custom_emoji_id: BTN_ICONS.DIAMOND,
-          style: 'success'
-        }
-      ],
-      [
-        {
-          text: '📋 ប្រវត្តិទាំងអស់ (All)',
-          callback_data: 'hist_all',
-          icon_custom_emoji_id: BTN_ICONS.CHART,
-          style: 'primary'
-        },
-        {
-          text: 'ទៅកាន់ Menu ចម្បង',
-          callback_data: 'back_main',
-          icon_custom_emoji_id: BTN_ICONS.BACK,
-          style: 'danger'
-        }
+    matches.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+    const now = new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' });
+
+    let text =
+      `🔍 <b>លទ្ធផលស្វែងរកប្រវត្តិ ID 1xBet:</b> <code>${escapeHtml(cleaned)}</code>\n` +
+      `👑 <b>Admin View:</b> <code>${matches.length} ប្រតិបត្តិការ</code>\n` +
+      `🕒 <b>កាលបរិច្ឆេទពិនិត្យ:</b> <code>${escapeHtml(now)}</code>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+    if (matches.length === 0) {
+      text += `\n<i>⚠️ មិនមានប្រវត្តិប្រតិបត្តិការសម្រាប់ ID 1xBet «<code>${escapeHtml(cleaned)}</code>» ឡើយ!</i>\n` +
+        `💡 <i>សូមពិនិត្យមើលលេខ ID 1xBet ឡើងវិញ ឬ ID នេះមិនទាន់មានប្រតិបត្តិការ។</i>\n`;
+    } else {
+      const completedTotal = matches
+        .filter(m => m.status === 'COMPLETED' && m.type === 'topup')
+        .reduce((sum, m) => sum + Number(m.amount || 0), 0);
+
+      text += `💰 <b>សរុបប្រាក់បញ្ចូលជោគជ័យ:</b> <b>+$${completedTotal.toFixed(2)} USD</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━\n`;
+
+      matches.slice(0, 8).forEach((item, idx) => {
+        const isTopup = item.type === 'topup';
+        const typeIcon = isTopup ? ANIM.DEPOSIT : ANIM.WITHDRAW;
+        const typeName = isTopup ? 'បញ្ចូលប្រាក់ (Top-Up)' : 'ដកប្រាក់ (Withdraw)';
+
+        let statusBadge = '⏳ កំពុងរង់ចាំ (Pending)';
+        if (item.status === 'COMPLETED') statusBadge = '✅ ជោគជ័យ (Done)';
+        if (item.status === 'REJECTED') statusBadge = '❌ បានបដិសេធ (Cancelled)';
+
+        const hasU = item.username && item.username !== 'គ្មាន' && item.username !== '@គ្មាន' && item.username !== 'User';
+        const userDisplay = hasU
+          ? (item.username.startsWith('@') ? item.username : `@${item.username}`)
+          : `ID: ${item.userId}`;
+
+        const dateStr = item.displayDate || item.date || 'N/A';
+
+        text += `\n<b>#${idx + 1}. ${typeIcon} ${typeName}</b>\n` +
+          `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${escapeHtml(item.oneXBetId || cleaned)}</code>\n` +
+          `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${Number(item.amount || 0).toFixed(2)} USD</b>\n` +
+          `${ANIM.CARD} <b>ធនាគារ:</b> <b>${escapeHtml(item.bank ? item.bank.toUpperCase() : 'BAKONG KHQR')}</b>\n` +
+          `${ANIM.USER} <b>អតិថិជន:</b> ${escapeHtml(item.name || 'User')} (${escapeHtml(userDisplay)})\n` +
+          `${ANIM.RECEIPT} <b>វិក្កយបត្រ:</b> <code>${escapeHtml(item.id)}</code>\n` +
+          `⚡️ <b>ស្ថានភាព:</b> ${statusBadge}\n` +
+          `🕒 <b>កាលបរិច្ឆេទ:</b> <b>${escapeHtml(dateStr)}</b>\n` +
+          `──────────────────`;
+      });
+
+      if (matches.length > 8) {
+        text += `\n<i>... និងមានចំនួន ${matches.length - 8} ប្រតិបត្តិការចាស់ៗទៀត</i>\n`;
+      }
+    }
+
+    const reply_markup = {
+      inline_keyboard: [
+        [
+          {
+            text: '🔍 ស្វែងរក ID ផ្សេងទៀត',
+            callback_data: 'admin_hist_search_1xbet',
+            icon_custom_emoji_id: BTN_ICONS.DIAMOND,
+            style: 'success'
+          }
+        ],
+        [
+          {
+            text: '📋 ប្រវត្តិទាំងអស់ (All)',
+            callback_data: 'hist_all',
+            icon_custom_emoji_id: BTN_ICONS.CHART,
+            style: 'primary'
+          },
+          {
+            text: 'ទៅកាន់ Menu ចម្បង',
+            callback_data: 'back_main',
+            icon_custom_emoji_id: BTN_ICONS.BACK,
+            style: 'danger'
+          }
+        ]
       ]
-    ]
-  };
+    };
 
-  return showScreen(ctx, { text, reply_markup });
+    return await showScreen(ctx, { text, reply_markup });
+  } catch (err) {
+    console.error("Error in showAdminSearch1xBetHistory:", err);
+    return ctx.reply(`⚠️ មានបញ្ហាក្នុងការស្វែងរក ID ${escapeHtml(searchId)}: ${err.message}`, {
+      reply_markup: {
+        inline_keyboard: [[{ text: 'ទៅកាន់ Menu ចម្បង', callback_data: 'back_main' }]]
+      }
+    }).catch(() => {});
+  }
 }
 
 function syncExistingRequestsToHistory() {
@@ -1335,7 +1433,11 @@ async function showScreen(ctx, { text, reply_markup, photo = null, video = null,
       }
     } catch (err) {
       console.warn("Could not send video, falling back to text:", err.message);
-      sent = await ctx.replyWithHTML(text, { reply_markup });
+      try {
+        sent = await ctx.replyWithHTML(text, { reply_markup });
+      } catch (errHtml) {
+        sent = await ctx.reply(text.replace(/<[^>]*>/g, ''), { reply_markup }).catch(() => {});
+      }
     }
   } else if (photo) {
     try {
@@ -1351,10 +1453,19 @@ async function showScreen(ctx, { text, reply_markup, photo = null, video = null,
       }
     } catch (err) {
       console.warn("Could not send photo, falling back to text:", err.message);
-      sent = await ctx.replyWithHTML(text, { reply_markup });
+      try {
+        sent = await ctx.replyWithHTML(text, { reply_markup });
+      } catch (errHtml) {
+        sent = await ctx.reply(text.replace(/<[^>]*>/g, ''), { reply_markup }).catch(() => {});
+      }
     }
   } else {
-    sent = await ctx.replyWithHTML(text, { reply_markup });
+    try {
+      sent = await ctx.replyWithHTML(text, { reply_markup });
+    } catch (errHtml) {
+      console.warn("Could not send HTML text, falling back to plain text:", errHtml.message);
+      sent = await ctx.reply(text.replace(/<[^>]*>/g, ''), { reply_markup }).catch(() => {});
+    }
   }
 
   if (sent?.message_id) {
@@ -3389,18 +3500,26 @@ bot.on('photo', async (ctx) => {
 bot.on('text', async (ctx) => {
   const userId = ctx.from.id;
   const userState = userStates.get(userId);
+  const textInput = (ctx.message?.text || '').trim();
 
   // Clean up user's typed message immediately so chat stays neat
   await ctx.deleteMessage().catch(() => { });
 
   // 0. Admin search history by 1xBet ID
-  if (userState?.state === 'AWAITING_ADMIN_SEARCH_1XBET_ID' && isAdmin(userId)) {
+  const isSearchState = userState?.state === 'AWAITING_ADMIN_SEARCH_1XBET_ID';
+  const isAdminUser = isAdmin(userId);
+  const isNumericId = /^\d{6,11}$/.test(textInput);
+  const isSearchCmd = /^(?:\/check|\/search|\/find|#check|#search)\s*(\d+)?$/i.test(textInput);
+
+  if (isSearchState || (isAdminUser && isNumericId) || (isAdminUser && isSearchCmd)) {
     userStates.delete(userId);
-    const searchId = ctx.message.text.trim();
-    return showAdminSearch1xBetHistory(ctx, searchId);
+    let searchId = textInput;
+    const cmdMatch = textInput.match(/^(?:\/check|\/search|\/find|#check|#search)\s*(\d+)/i);
+    if (cmdMatch && cmdMatch[1]) searchId = cmdMatch[1];
+    return await showAdminSearch1xBetHistory(ctx, searchId);
   }
-  if (userState?.state === 'AWAITING_1XBET_ID' || userState?.state === 'AWAITING_MELBET_ID') {
-    const oneXBetId = ctx.message.text.trim();
+  if (userState?.state === 'AWAITING_1XBET_ID' || userState?.state === 'AWAITING_MELBET_ID' || (!userState && !isAdminUser && isNumericId)) {
+    const oneXBetId = textInput;
     if (!oneXBetId) return;
 
     const checkResult = await verifyOneXBetId(oneXBetId, ctx.from);
