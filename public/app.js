@@ -8,6 +8,7 @@
 
   // ================= CONFIG & CONSTANTS =================
   const CHANNEL_LINK = 'https://t.me/MakoVIPgroup';
+  const GROUP_LINK = 'https://t.me/makotipsball';
   const SUPPORT_LINK = 'https://t.me/ma_ko168';
   const API_BASE = '/api/miniapp';
 
@@ -33,7 +34,8 @@
     pollInterval: null,
     countdownInterval: null,
     secondsLeft: 60,
-    savedIds: []
+    savedIds: [],
+    membershipVerified: false
   };
 
   // Withdraw Global State (Code + QR Code)
@@ -91,6 +93,7 @@
   const els = {
     // Header
     btnChannel: $('btnChannel'),
+    btnGroup: $('btnGroup'),
     btnSupport: $('btnSupport'),
     btnWalletPill: $('btnWalletPill'),
     headerBalanceText: $('headerBalanceText'),
@@ -441,6 +444,10 @@
       });
 
       const data = await res.json();
+      if (data.needJoin) {
+        verifyMembershipGate(true);
+        return;
+      }
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'បរាជ័យក្នុងការបង្កើតកាតទូទាត់');
       }
@@ -631,6 +638,106 @@
     }
   }
 
+  // ================= MEMBERSHIP GATE (FORCE-SUB LOCK) =================
+  let isCheckingMembership = false;
+  async function verifyMembershipGate(isManualClick = false) {
+    if (isCheckingMembership) return;
+    const gateOverlay = $('gateOverlay');
+    const gateBtnVerify = $('gateBtnVerify');
+    const gateBtnVerifyText = $('gateBtnVerifyText');
+    const gateAlert = $('gateAlert');
+    const gateAlertText = $('gateAlertText');
+    const gateItemChannel = $('gateItemChannel');
+    const gateItemGroup = $('gateItemGroup');
+    const gateBtnJoinChannel = $('gateBtnJoinChannel');
+    const gateBtnJoinGroup = $('gateBtnJoinGroup');
+
+    if (!gateOverlay) return;
+
+    if (isManualClick && gateBtnVerifyText) {
+      gateBtnVerifyText.textContent = 'កំពុងពិនិត្យ...';
+      if (gateBtnVerify) gateBtnVerify.disabled = true;
+    }
+
+    isCheckingMembership = true;
+    try {
+      const res = await fetch(`${API_BASE}/check-membership?userId=${encodeURIComponent(state.user.id)}`);
+      if (!res.ok) throw new Error('Network error');
+      const data = await res.json();
+
+      if (data.isMember) {
+        state.membershipVerified = true;
+        if (gateAlert) gateAlert.classList.add('hidden');
+        if (isManualClick) {
+          tgHaptic('success');
+          if (gateBtnVerifyText) gateBtnVerifyText.textContent = '✅ បានផ្ទៀងផ្ទាត់ជោគជ័យ!';
+        }
+        gateOverlay.classList.add('fade-out');
+        setTimeout(() => {
+          gateOverlay.classList.add('hidden');
+          gateOverlay.classList.remove('fade-out');
+        }, 280);
+      } else {
+        state.membershipVerified = false;
+        gateOverlay.classList.remove('hidden');
+
+        // Update Channel button status
+        if (data.channelMember) {
+          if (gateItemChannel) gateItemChannel.classList.add('joined');
+          if (gateBtnJoinChannel) {
+            gateBtnJoinChannel.classList.add('joined');
+            gateBtnJoinChannel.innerHTML = `<svg viewBox="0 0 24 24" class="check-ico" style="width:14px;height:14px;stroke-width:2.5;"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5"/></svg><span>បានចូល</span>`;
+          }
+        } else {
+          if (gateItemChannel) gateItemChannel.classList.remove('joined');
+          if (gateBtnJoinChannel) {
+            gateBtnJoinChannel.classList.remove('joined');
+            gateBtnJoinChannel.innerHTML = `<span>ចូលរួម</span><svg viewBox="0 0 24 24" class="join-btn-ico"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>`;
+          }
+        }
+
+        // Update Group button status
+        if (data.groupMember) {
+          if (gateItemGroup) gateItemGroup.classList.add('joined');
+          if (gateBtnJoinGroup) {
+            gateBtnJoinGroup.classList.add('joined');
+            gateBtnJoinGroup.innerHTML = `<svg viewBox="0 0 24 24" class="check-ico" style="width:14px;height:14px;stroke-width:2.5;"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5"/></svg><span>បានចូល</span>`;
+          }
+        } else {
+          if (gateItemGroup) gateItemGroup.classList.remove('joined');
+          if (gateBtnJoinGroup) {
+            gateBtnJoinGroup.classList.remove('joined');
+            gateBtnJoinGroup.innerHTML = `<span>ចូលរួម</span><svg viewBox="0 0 24 24" class="join-btn-ico"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>`;
+          }
+        }
+
+        if (isManualClick) {
+          tgHaptic('warning');
+          let msg = '⚠️ អ្នកមិនទាន់បានចូលរួមគ្រប់លក្ខខណ្ឌទេ!';
+          if (!data.channelMember && !data.groupMember) {
+            msg = '⚠️ សូមចុចចូលរួមទាំង Channel និង Group ជាមុនសិន!';
+          } else if (!data.channelMember) {
+            msg = '⚠️ សូមចុចចូលរួម Channel ជាមុនសិន!';
+          } else if (!data.groupMember) {
+            msg = '⚠️ សូមចុចចូលរួម Group ជាមុនសិន!';
+          }
+          if (gateAlert && gateAlertText) {
+            gateAlertText.textContent = msg;
+            gateAlert.classList.remove('hidden');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Membership check error:', e);
+    } finally {
+      isCheckingMembership = false;
+      if (gateBtnVerify) gateBtnVerify.disabled = false;
+      if (!state.membershipVerified && gateBtnVerifyText) {
+        gateBtnVerifyText.textContent = 'ខ្ញុំបានចូលរួមហើយ (Verify)';
+      }
+    }
+  }
+
   // ================= PROFILE TAB ACTIONS =================
   async function fetchUserData() {
     try {
@@ -704,9 +811,32 @@
   // ================= BIND GLOBAL EVENTS =================
   function bindEvents() {
     // Header Links
-    els.btnChannel.addEventListener('click', () => { tgHaptic('light'); tgOpenUrl(CHANNEL_LINK); });
-    els.btnSupport.addEventListener('click', () => { tgHaptic('light'); tgOpenUrl(SUPPORT_LINK); });
+    if (els.btnChannel) els.btnChannel.addEventListener('click', () => { tgHaptic('light'); tgOpenUrl(CHANNEL_LINK); });
+    if (els.btnGroup) els.btnGroup.addEventListener('click', () => { tgHaptic('light'); tgOpenUrl(GROUP_LINK); });
+    if (els.btnSupport) els.btnSupport.addEventListener('click', () => { tgHaptic('light'); tgOpenUrl(SUPPORT_LINK); });
     els.btnWalletPill.addEventListener('click', () => switchTab('profile'));
+
+    // Strict Force-Sub Gate Buttons
+    const gateBtnJoinChannel = $('gateBtnJoinChannel');
+    const gateBtnJoinGroup = $('gateBtnJoinGroup');
+    const gateBtnVerify = $('gateBtnVerify');
+    if (gateBtnJoinChannel) {
+      gateBtnJoinChannel.addEventListener('click', () => {
+        tgHaptic('light');
+        tgOpenUrl(CHANNEL_LINK);
+      });
+    }
+    if (gateBtnJoinGroup) {
+      gateBtnJoinGroup.addEventListener('click', () => {
+        tgHaptic('light');
+        tgOpenUrl(GROUP_LINK);
+      });
+    }
+    if (gateBtnVerify) {
+      gateBtnVerify.addEventListener('click', () => {
+        verifyMembershipGate(true);
+      });
+    }
 
     // Bottom Navigation
     els.navItems.forEach(item => {
@@ -850,6 +980,7 @@
     setupGuideSwitch();
     loadSavedIds();
     fetchUserData();
+    verifyMembershipGate(false);
 
     // Default selection
     if (!state.oneXBetId && state.savedIds.length > 0) {

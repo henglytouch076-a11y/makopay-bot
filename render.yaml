@@ -14,6 +14,12 @@ services:
         value: "@MakoVIPgroup"
       - key: CHANNEL_LINK
         value: "https://t.me/MakoVIPgroup"
+      - key: GROUP_ID
+        value: "-1004327966825"
+      - key: GROUP_USERNAME
+        value: "@makotipsball"
+      - key: GROUP_LINK
+        value: "https://t.me/makotipsball"
       - key: SUPPORT_USERNAME
         value: "@ma_ko168"
       - key: SUPPORT_LINK

@@ -84,6 +84,9 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID || '-1002180018274';
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || '@MakoVIPgroup';
 const CHANNEL_LINK = process.env.CHANNEL_LINK || 'https://t.me/MakoVIPgroup';
+const GROUP_ID = process.env.GROUP_ID || '-1004327966825';
+const GROUP_USERNAME = process.env.GROUP_USERNAME || '@makotipsball';
+const GROUP_LINK = process.env.GROUP_LINK || 'https://t.me/makotipsball';
 const SUPPORT_USERNAME = process.env.SUPPORT_USERNAME || '@ma_ko168';
 const SUPPORT_LINK = process.env.SUPPORT_LINK || 'https://t.me/ma_ko168';
 
@@ -1984,27 +1987,48 @@ async function checkPaymentStatus(tranId, md5, tx = null) {
 
 
 async function checkMembership(ctx, userId) {
+  const validStatuses = ['creator', 'administrator', 'member', 'restricted'];
+  let channelMember = false;
+  let groupMember = false;
+  let channelError = null;
+  let groupError = null;
+
   try {
     const member = await ctx.telegram.getChatMember(CHANNEL_ID, userId);
-    const validStatuses = ['creator', 'administrator', 'member', 'restricted'];
-    return {
-      isMember: validStatuses.includes(member.status),
-      error: null
-    };
+    channelMember = validStatuses.includes(member.status);
   } catch (error) {
-    const errMsg = error.response?.description || error.message;
-    return {
-      isMember: false,
-      error: errMsg
-    };
+    channelError = error.response?.description || error.message;
   }
+
+  try {
+    const member = await ctx.telegram.getChatMember(GROUP_ID, userId);
+    groupMember = validStatuses.includes(member.status);
+  } catch (error) {
+    groupError = error.response?.description || error.message;
+  }
+
+  return {
+    isMember: channelMember && groupMember,
+    channelMember,
+    groupMember,
+    channelError,
+    groupError,
+    error: channelError || groupError
+  };
 }
 
 // ---------------- MENUS ----------------
 
-function getForceSubMenu() {
+function getForceSubMenu(status = null) {
+  let subStatusText = '';
+  if (status && status.channelMember && !status.groupMember) {
+    subStatusText = `\n\n${ANIM.BULB} <i>អ្នកបានចូលរួម Channel រួចរាល់ហើយ នៅខ្វះ <b>Group</b> មួយទៀត!</i>`;
+  } else if (status && !status.channelMember && status.groupMember) {
+    subStatusText = `\n\n${ANIM.BULB} <i>អ្នកបានចូលរួម Group រួចរាល់ហើយ នៅខ្វះ <b>Channel</b> មួយទៀត!</i>`;
+  }
+
   const text =
-    `${ANIM.MEGAPHONE} <b>សូមចូលរួម Channel របស់យើងសិន ដើម្បីប្រើប្រាស់ Bot</b>
+    `${ANIM.MEGAPHONE} <b>សូមចូលរួម Channel និង Group របស់យើងសិន ដើម្បីប្រើប្រាស់ Bot</b>${subStatusText}
 
 ${ANIM.BULB} <i>បន្ទាប់ពីចូលរួម សូមចុចប៊ូតុង " ${ANIM.FLOWER} ខ្ញុំបានចូលរួមហើយ " ខាងក្រោម</i>`;
 
@@ -2012,9 +2036,17 @@ ${ANIM.BULB} <i>បន្ទាប់ពីចូលរួម សូមចុច
     inline_keyboard: [
       [
         {
-          text: 'ចូលរួម Channel',
+          text: status?.channelMember ? '✅ បានចូលរួម Channel ហើយ' : 'ចូលរួម Channel',
           url: CHANNEL_LINK,
-          icon_custom_emoji_id: BTN_ICONS.MEGAPHONE,
+          icon_custom_emoji_id: status?.channelMember ? BTN_ICONS.CHECK : BTN_ICONS.MEGAPHONE,
+          style: 'primary'
+        }
+      ],
+      [
+        {
+          text: status?.groupMember ? '✅ បានចូលរួម Group ហើយ' : 'ចូលរួម Group',
+          url: GROUP_LINK,
+          icon_custom_emoji_id: status?.groupMember ? BTN_ICONS.CHECK : BTN_ICONS.CHAT,
           style: 'primary'
         }
       ],
@@ -2208,10 +2240,16 @@ bot.use(async (ctx, next) => {
     const check = await checkMembership(ctx, userId);
 
     if (!check.isMember) {
-      const { text, reply_markup } = getForceSubMenu();
+      const { text, reply_markup } = getForceSubMenu(check);
 
       if (ctx.callbackQuery) {
-        await ctx.answerCbQuery('⚠️ អ្នកត្រូវតែចូលរួម Channel ជាមុនសិន ដើម្បីប្រើប្រាស់ Bot!', { show_alert: true }).catch(() => { });
+        let warnText = '⚠️ អ្នកត្រូវតែចូលរួម Channel និង Group ជាមុនសិន ដើម្បីប្រើប្រាស់ Bot!';
+        if (check.channelMember && !check.groupMember) {
+          warnText = '⚠️ អ្នកត្រូវតែចូលរួម Group ជាមុនសិន ដើម្បីប្រើប្រាស់ Bot!';
+        } else if (!check.channelMember && check.groupMember) {
+          warnText = '⚠️ អ្នកត្រូវតែចូលរួម Channel ជាមុនសិន ដើម្បីប្រើប្រាស់ Bot!';
+        }
+        await ctx.answerCbQuery(warnText, { show_alert: true }).catch(() => { });
       }
       return showScreen(ctx, { text, reply_markup });
     }
@@ -2394,13 +2432,20 @@ bot.action('verify_joined', async (ctx) => {
     const check = await checkMembership(ctx, userId);
 
     if (check.isMember) {
-      await ctx.answerCbQuery('🎉 សូមអរគុណ! អ្នកបានចូលរួម Channel ជោគជ័យហើយ!', { show_alert: true }).catch(() => { });
+      await ctx.answerCbQuery('🎉 សូមអរគុណ! អ្នកបានចូលរួម Channel និង Group ជោគជ័យហើយ!', { show_alert: true }).catch(() => { });
       return showScreen(ctx, getMainMenu(user));
     } else {
-      await ctx.answerCbQuery(
-        '⚠️ សូមអភ័យទោស! អ្នកមិនទាន់បានចុចចូលរួម Channel ទេ!\n\nសូមចុចប៊ូតុង "ចូលរួម Channel" ជាមុនសិន រួចចុចផ្ទៀងផ្ទាត់ម្តងទៀត។',
-        { show_alert: true }
-      ).catch(() => { });
+      let missingMsg = '⚠️ សូមអភ័យទោស! ';
+      if (!check.channelMember && !check.groupMember) {
+        missingMsg += 'អ្នកមិនទាន់បានចូលរួម Channel និង Group ទេ!\n\nសូមចុចចូលរួមទាំងពីរខាងលើ រួចចុចផ្ទៀងផ្ទាត់ម្តងទៀត។';
+      } else if (!check.channelMember) {
+        missingMsg += 'អ្នកមិនទាន់បានចូលរួម Channel ទេ!\n\nសូមចុចប៊ូតុង "ចូលរួម Channel" ជាមុនសិន រួចចុចផ្ទៀងផ្ទាត់ម្តងទៀត។';
+      } else if (!check.groupMember) {
+        missingMsg += 'អ្នកមិនទាន់បានចូលរួម Group ទេ!\n\nសូមចុចប៊ូតុង "ចូលរួម Group" ជាមុនសិន រួចចុចផ្ទៀងផ្ទាត់ម្តងទៀត។';
+      }
+
+      await ctx.answerCbQuery(missingMsg, { show_alert: true }).catch(() => { });
+      return showScreen(ctx, getForceSubMenu(check));
     }
   } catch (err) {
     await ctx.answerCbQuery('⚠️ មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់! សូមព្យាយាមម្តងទៀត។').catch(() => { });
@@ -4025,6 +4070,7 @@ console.log('━━━━━━━━━━━━━━━━━━━━━━�
 console.log('🤖 Starting Telegram Bot with AUTHENTIC KHQR CARD & 1-MIN EXPIRY...');
 console.log(`📡 Bot Username: @MakoPay_bot`);
 console.log(`📢 Target Channel: ${CHANNEL_USERNAME} (${CHANNEL_ID})`);
+console.log(`⚽️ Target Group: ${GROUP_USERNAME} (${GROUP_ID})`);
 console.log(`📥 ដាក់ប្រាក់ (Top-Up) Group: ${ADMIN_TOPUP_GROUP_ID}`);
 console.log(`📤 ដកប្រាក់ (Withdrawal) Group: ${ADMIN_WITHDRAW_GROUP_ID}`);
 console.log(`💳 Payment Gateway: ${PAYLINK_BASE_URL}`);
@@ -4253,6 +4299,39 @@ const server = http.createServer(async (req, res) => {
     return res.end(html);
   }
 
+  // 1.5. Mini App API: Check Channel & Group Membership Gate
+  if ((req.method === 'POST' || req.method === 'GET') && pathname === '/api/miniapp/check-membership') {
+    try {
+      let userId = null;
+      if (req.method === 'POST') {
+        const body = await parseJsonBody(req);
+        userId = body.userId;
+      } else {
+        userId = parsedUrl.query.userId;
+      }
+      userId = userId ? parseInt(userId, 10) : null;
+      if (!userId) {
+        return sendJson(res, 400, { success: false, error: 'Missing userId' });
+      }
+
+      const check = await checkMembership(bot, userId);
+      return sendJson(res, 200, {
+        success: true,
+        isMember: check.isMember,
+        channelMember: check.channelMember,
+        groupMember: check.groupMember,
+        channelUsername: CHANNEL_USERNAME,
+        channelLink: CHANNEL_LINK,
+        groupUsername: GROUP_USERNAME,
+        groupLink: GROUP_LINK,
+        error: check.error || null
+      });
+    } catch (err) {
+      console.error('API Error /api/miniapp/check-membership:', err);
+      return sendJson(res, 500, { success: false, error: err.message });
+    }
+  }
+
   // 2. Mini App API: Check 1xBet ID in App
   if ((req.method === 'POST' || req.method === 'GET') && pathname === '/api/miniapp/check-id') {
     try {
@@ -4293,6 +4372,16 @@ const server = http.createServer(async (req, res) => {
       const userId = body.userId || 6810457857;
       const username = body.username || 'User';
       const name = body.name || 'Member';
+
+      // Check Channel & Group membership
+      const membership = await checkMembership(bot, userId);
+      if (!membership.isMember) {
+        return sendJson(res, 403, {
+          success: false,
+          needJoin: true,
+          error: 'អ្នកត្រូវតែចូលរួម Channel និង Group ជាមុនសិន!'
+        });
+      }
 
       if (isNaN(amount) || amount < 3 || amount > 10000) {
         return sendJson(res, 400, { success: false, error: 'ចំនួនទឹកប្រាក់ត្រូវតែចាប់ពី $3.00 ឡើងទៅ (អតិបរមា: $10,000)' });
@@ -4417,6 +4506,16 @@ const server = http.createServer(async (req, res) => {
       const userId = body.userId || 6810457857;
       const username = body.username || 'User';
       const name = body.name || 'Member';
+
+      // Check Channel & Group membership
+      const membership = await checkMembership(bot, userId);
+      if (!membership.isMember) {
+        return sendJson(res, 403, {
+          success: false,
+          needJoin: true,
+          error: 'អ្នកត្រូវតែចូលរួម Channel និង Group ជាមុនសិន!'
+        });
+      }
 
       if (!code || code.length < 4) {
         return sendJson(res, 400, { success: false, error: 'សូមបញ្ចូលលេខកូដដកប្រាក់ 4 ខ្ទង់ពី 1xBet!' });
