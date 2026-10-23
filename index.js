@@ -82,8 +82,8 @@ const ADMIN_WITHDRAW_GROUP_ID = process.env.ADMIN_WITHDRAW_GROUP_ID || '-1003907
 
 // PayLinkAPI Configuration
 const PAYLINK_BASE_URL = (process.env.PAYLINK_BASE_URL || 'https://paylinkapi-bot.onrender.com').replace(/\/+$/, '');
-const PAYLINK_API_KEY = process.env.PAYLINK_API_KEY || 'plk_live_std_c3558761993b';
-const PAYLINK_SECRET = process.env.PAYLINK_SECRET || 'whsec_afe9c40b20d3e9ec';
+const PAYLINK_API_KEY = process.env.PAYLINK_API_KEY || 'plk_live_6810457857_ed8a2a0f';
+const PAYLINK_SECRET = process.env.PAYLINK_SECRET || 'whsec_f61322d1b4d50385';
 const BAKONG_ACCOUNT = process.env.BAKONG_ACCOUNT || 'hengly_touch@bkrt';
 const STORE_NAME = process.env.STORE_NAME || 'MAKO CAMBO';
 const MOBCASH_APP_URL = process.env.MOBCASH_APP_URL || 'https://tinyurl.com/mobcashnew';
@@ -2588,8 +2588,8 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
       stateRequestTime: data.stateRequestTime || null,
       deviceId: data.deviceId || null,
       qrString: data.qrString,
-      deepLink: computedDeepLink,
-      androidIntent: computedAndroidIntent,
+      deepLink: data.deepLink || null,
+      androidIntent: null,
       msgId: sentMsg.message_id,
       timerId,
       pollInterval,
