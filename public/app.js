@@ -588,7 +588,7 @@
       } finally {
         isCheckingTopupStatus = false;
       }
-    }, 2500);
+    }, 5000);
   }
 
   function onPaymentSuccess(data) {

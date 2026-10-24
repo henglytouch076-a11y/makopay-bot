@@ -2007,7 +2007,29 @@ async function checkAbaPaymentStatus(token, clientId, stateRequestTime, deviceId
   };
 }
 
+// PayLinkAPI Rate-Limit / Cooldown Tracker
+let payLinkCooldownUntil = 0;
+
+function isPayLinkInCooldown() {
+  return Date.now() < payLinkCooldownUntil;
+}
+
+function setPayLinkCooldown(seconds = 64) {
+  const waitSec = Math.max(15, Number(seconds) || 64);
+  payLinkCooldownUntil = Date.now() + (waitSec * 1000);
+  console.warn(`⚠️ [PayLink Rate-Limit] Cooldown active for ${waitSec}s (until ${new Date(payLinkCooldownUntil).toLocaleTimeString()})`);
+}
+
+function getPayLinkCooldownRemaining() {
+  return Math.max(0, Math.ceil((payLinkCooldownUntil - Date.now()) / 1000));
+}
+
 async function generateKHQR(amount, currency = 'USD', bank = 'bakong') {
+  if (isPayLinkInCooldown()) {
+    const sec = getPayLinkCooldownRemaining();
+    throw new Error(`RATE_LIMIT:ប្រព័ន្ធធនាគារកំពុងមមាញឹក (Rate Limit) សូមរង់ចាំ ${sec} វិនាទី រួចសាកល្បងម្ដងទៀត!`);
+  }
+
   const url = `${PAYLINK_BASE_URL}/api/bakong/generate-qr`;
   const response = await fetch(url, {
     method: 'POST',
@@ -2021,6 +2043,15 @@ async function generateKHQR(amount, currency = 'USD', bank = 'bakong') {
 
   if (!response.ok) {
     const errorText = await response.text();
+    if (response.status === 429) {
+      let retrySec = 64;
+      try {
+        const parsed = JSON.parse(errorText);
+        if (parsed.retryAfterSeconds) retrySec = parsed.retryAfterSeconds;
+      } catch (_) {}
+      setPayLinkCooldown(retrySec);
+      throw new Error(`RATE_LIMIT:ប្រព័ន្ធធនាគារកំពុងមមាញឹក (Rate Limit) សូមរង់ចាំ ${retrySec} វិនាទី រួចសាកល្បងម្ដងទៀត!`);
+    }
     throw new Error(`PayLinkAPI error: ${response.status} - ${errorText}`);
   }
 
@@ -2049,6 +2080,10 @@ async function checkPaymentStatus(tranId, md5, tx = null) {
     }
   }
 
+  if (isPayLinkInCooldown()) {
+    return { success: true, paid: false, status: 'PENDING', rateLimited: true };
+  }
+
   const targetMd5 = md5 || transaction?.md5;
   const url = `${PAYLINK_BASE_URL}/api/web/check-payment`;
   const response = await fetch(url, {
@@ -2062,10 +2097,24 @@ async function checkPaymentStatus(tranId, md5, tx = null) {
 
   if (!response.ok) {
     const errorText = await response.text();
+    if (response.status === 429) {
+      let retrySec = 64;
+      try {
+        const parsed = JSON.parse(errorText);
+        if (parsed.retryAfterSeconds) retrySec = parsed.retryAfterSeconds;
+      } catch (_) {}
+      setPayLinkCooldown(retrySec);
+      return { success: true, paid: false, status: 'PENDING', rateLimited: true };
+    }
     throw new Error(`PayLinkAPI check error: ${response.status} - ${errorText}`);
   }
 
-  return await response.json();
+  const data = await response.json();
+  if (transaction) {
+    transaction.lastCheckTime = Date.now();
+    transaction.lastStatus = data.status || (data.paid ? 'PAID' : 'PENDING');
+  }
+  return data;
 }
 
 
@@ -3002,6 +3051,7 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
     let isPolling = false;
     const pollInterval = setInterval(async () => {
       if (isPolling) return;
+      if (isPayLinkInCooldown()) return; // Pause during cooldown to avoid triggering DDoS lockout
       if (processedTopupTrans.has(tranId)) {
         clearInterval(pollInterval);
         return;
@@ -3029,7 +3079,7 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
         checkingTopupTxs.delete(tranId);
         isPolling = false;
       }
-    }, 2500);
+    }, 6000);
 
     // 4. Set 3-Minute Live Expiry Timer
     const timerId = setTimeout(async () => {
@@ -3110,8 +3160,14 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
 
   } catch (err) {
     console.error("Error creating KHQR:", err);
+    let errMsg = err.message || 'Error';
+    if (errMsg.startsWith('RATE_LIMIT:')) {
+      errMsg = errMsg.replace('RATE_LIMIT:', '');
+    } else if (errMsg.includes('429') || errMsg.includes('DDOS_PROTECTION_TRIGGERED') || errMsg.includes('Too many requests')) {
+      errMsg = 'ប្រព័ន្ធធនាគារកំពុងមមាញឹក (Rate Limit) សូមរង់ចាំប្រហែល 1 នាទី រួចសាកល្បងម្ដងទៀត!';
+    }
     await showScreen(ctx, {
-      text: `${ANIM.WARN} <b>មានបញ្ហាក្នុងការបង្កើតកូដ KHQR:</b> <code>${err.message}</code>\nសូមទាក់ទង Admin: ${SUPPORT_LINK}`,
+      text: `${ANIM.WARN} <b>មានបញ្ហាក្នុងការបង្កើតកូដ KHQR:</b>\n<i>${errMsg}</i>\n\nសូមទាក់ទង Admin: ${SUPPORT_LINK}`,
       reply_markup: {
         inline_keyboard: [[{ text: 'ត្រឡប់ក្រោយ (Back)', callback_data: 'menu_topup', icon_custom_emoji_id: BTN_ICONS.BACK, style: 'danger' }]]
       }
@@ -3185,6 +3241,12 @@ bot.action(/verify_pay_(.+)/, async (ctx) => {
 
   if (!tx) {
     await ctx.answerCbQuery('⚠️ វិក្កយបត្រនេះបានផុតកំណត់ ឬមិនត្រឹមត្រូវទេ!', { show_alert: true }).catch(() => { });
+    return;
+  }
+
+  if (isPayLinkInCooldown()) {
+    const sec = getPayLinkCooldownRemaining();
+    await ctx.answerCbQuery(`⏳ ប្រព័ន្ធធនាគារកំពុងមមាញឹក (Rate Limit) សូមរង់ចាំ ${sec} វិនាទី រួចចុចពិនិត្យម្ដងទៀត!`, { show_alert: true }).catch(() => { });
     return;
   }
 
@@ -4478,10 +4540,11 @@ const server = http.createServer(async (req, res) => {
       const tranId = data.tranId;
       const displayMerchant = ADMIN_BAKONG_NAME;
 
-      // Start server-side 2.5-second live poller so admin group is alerted even if user minimizes/closes mini app
+      // Start server-side 6-second live poller so admin group is alerted even if user minimizes/closes mini app
       let isPolling = false;
       const pollInterval = setInterval(async () => {
         if (isPolling) return;
+        if (isPayLinkInCooldown()) return; // Pause during cooldown to avoid triggering DDoS lockout
         if (processedTopupTrans.has(tranId)) {
           clearInterval(pollInterval);
           return;
@@ -4510,7 +4573,7 @@ const server = http.createServer(async (req, res) => {
           checkingTopupTxs.delete(tranId);
           isPolling = false;
         }
-      }, 2500);
+      }, 6000);
 
       // 3-Minute Live Expiry Timer
       const timerId = setTimeout(() => {
@@ -4565,7 +4628,13 @@ const server = http.createServer(async (req, res) => {
       });
     } catch (err) {
       console.error('API Error /create-qr:', err);
-      return sendJson(res, 500, { success: false, error: err.message });
+      let errMsg = err.message || 'Error';
+      if (errMsg.startsWith('RATE_LIMIT:')) {
+        errMsg = errMsg.replace('RATE_LIMIT:', '');
+      } else if (errMsg.includes('429') || errMsg.includes('DDOS_PROTECTION_TRIGGERED') || errMsg.includes('Too many requests')) {
+        errMsg = 'ប្រព័ន្ធធនាគារកំពុងមមាញឹក (Rate Limit) សូមរង់ចាំប្រហែល 1 នាទី រួចសាកល្បងម្ដងទៀត!';
+      }
+      return sendJson(res, 500, { success: false, error: errMsg });
     }
   }
 
@@ -4593,6 +4662,16 @@ const server = http.createServer(async (req, res) => {
       const tx = pendingTxs.get(tranId);
       if (!tx) {
         return sendJson(res, 200, { success: true, status: 'EXPIRED', paid: false });
+      }
+
+      // 1. Cache-first: if recently checked within 4.5 seconds by server poller or previous request, return cached status
+      if (tx.lastCheckTime && (Date.now() - tx.lastCheckTime < 4500)) {
+        return sendJson(res, 200, { success: true, status: tx.lastStatus || 'PENDING', paid: false });
+      }
+
+      // 2. Cooldown check: if currently in rate limit cooldown, do not fire external request
+      if (isPayLinkInCooldown()) {
+        return sendJson(res, 200, { success: true, status: tx.lastStatus || 'PENDING', paid: false, rateLimited: true });
       }
 
       // Prevent concurrent duplicate checks on same tranId
