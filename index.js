@@ -1488,7 +1488,7 @@ async function processSuccessfulTopup(tranId) {
   // 6. Notify Admin Top-Up Group ONCE ONLY (Image 1 Format)
   const userInfo = formatUserInfo({
     username: tx.username,
-    name: user.name || 'User',
+    name: user.name || tx.name || 'User',
     userId: tx.userId
   });
 
@@ -1496,16 +1496,22 @@ async function processSuccessfulTopup(tranId) {
     ? `<a href="tg://waitId/${sentSuccess.message_id}">&#8203;</a>`
     : '';
 
+  const cleanCustomerName = escapeHtml(userInfo.customerName || 'User');
+  const cleanUsernameStr = userInfo.cleanUsername ? ` (${escapeHtml(userInfo.cleanUsername)})` : '';
+  const customerLink = (tx.userId && Number(tx.userId) > 0)
+    ? `<a href="tg://user?id=${tx.userId}">${cleanCustomerName}</a>`
+    : cleanCustomerName;
+
   const adminTopupText =
     `${ANIM.CARD} <b>MAKO CAMBO BOT</b>${hiddenWaitLink}\n` +
     `${ANIM.SUCCESS} <b>បានបញ្ចូលទឹកប្រាក់ជោគជ័យ</b>\n\n` +
     `${getAdminBankLine(tx.bank)}\n` +
-    `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${tx.oneXBetId}</code>\n` +
+    `${ANIM.DIAMOND} <b>ID 1xBet:</b> <code>${escapeHtml(tx.oneXBetId || 'N/A')}</code>\n` +
     `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>+$${tx.usdAmount.toFixed(2)} USD</b>\n` +
     `━━━━━━━━━━━━━━━\n` +
-    `${ANIM.CROWN} <b>អតិថិជន:</b> <a href="tg://user?id=${tx.userId}">${userInfo.customerName}</a>${userInfo.cleanUsername ? ` (${userInfo.cleanUsername})` : ''}\n` +
-    `${ANIM.INFO} <b>Telegram ID:</b> <code>${tx.userId}</code>\n` +
-    `${ANIM.RECEIPT} <b>លេខវិក្កយបត្រ:</b> <code>${tx.tranId}</code>\n` +
+    `${ANIM.CROWN} <b>អតិថិជន:</b> ${customerLink}${cleanUsernameStr}\n` +
+    `${ANIM.INFO} <b>Telegram ID:</b> <code>${escapeHtml(tx.userId || 'N/A')}</code>\n` +
+    `${ANIM.RECEIPT} <b>លេខវិក្កយបត្រ:</b> <code>${escapeHtml(tx.tranId)}</code>\n` +
     `<b>កាលបរិច្ឆេទ:</b> <code>${new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</code>`;
 
   const adminTopupMarkup = {
@@ -1535,18 +1541,95 @@ async function processSuccessfulTopup(tranId) {
     ]
   };
 
-  if (ADMIN_TOPUP_GROUP_ID) {
+  const standardAdminMarkup = {
+    inline_keyboard: [
+      [
+        {
+          text: 'បញ្ចូលជោគជ័យ (Done)',
+          callback_data: `adm_td_${tx.tranId}`
+        },
+        {
+          text: 'បដិសេធ (Cancel)',
+          callback_data: `adm_tc_${tx.tranId}`
+        }
+      ],
+      [
+        {
+          text: `🔍 ពិនិត្យប្រវត្តិ (${tx.oneXBetId})`,
+          callback_data: `grp_chk_${tx.oneXBetId}`
+        }
+      ]
+    ]
+  };
+
+  const plainTopupText =
+    `💳 MAKO CAMBO BOT\n` +
+    `✅ បានបញ្ចូលទឹកប្រាក់ជោគជ័យ (Top-Up Alert)\n\n` +
+    `Bakong : ${ADMIN_BAKONG_NAME}\n` +
+    `💎 ID 1xBet: ${tx.oneXBetId || 'N/A'}\n` +
+    `💵 ចំនួនទឹកប្រាក់: +$${tx.usdAmount.toFixed(2)} USD\n` +
+    `━━━━━━━━━━━━━━━\n` +
+    `👑 អតិថិជន: ${userInfo.customerName}${userInfo.cleanUsername ? ` (${userInfo.cleanUsername})` : ''}\n` +
+    `ℹ️ Telegram ID: ${tx.userId || 'N/A'}\n` +
+    `🧾 លេខវិក្កយបត្រ: ${tx.tranId}\n` +
+    `កាលបរិច្ឆេទ: ${new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}`;
+
+  const targetGroups = Array.from(new Set([
+    ADMIN_TOPUP_GROUP_ID,
+    ADMIN_GROUP_ID
+  ].filter(Boolean)));
+
+  let sentToGroup = false;
+
+  for (const grpId of targetGroups) {
+    // Stage 1: Rich formatted message with custom emojis & styles
     try {
-      await bot.telegram.sendMessage(ADMIN_TOPUP_GROUP_ID, adminTopupText, {
+      await bot.telegram.sendMessage(grpId, adminTopupText, {
         parse_mode: 'HTML',
         reply_markup: adminTopupMarkup
       });
-      console.log(`✅ [TopUp Alert] Successfully alerted Admin Top-Up Group (${ADMIN_TOPUP_GROUP_ID}) for tranId: ${tx.tranId}, Amount: $${tx.usdAmount}`);
-    } catch (err) {
-      console.error(`❌ Failed to send top-up to admin group (${ADMIN_TOPUP_GROUP_ID}):`, err.message);
+      sentToGroup = true;
+      console.log(`✅ [TopUp Alert] Successfully alerted Admin Top-Up Group (${grpId}) for tranId: ${tx.tranId}, Amount: $${tx.usdAmount}`);
+      break;
+    } catch (errRich) {
+      console.warn(`⚠️ [TopUp Alert] Rich markup alert failed for ${grpId} (${errRich.message}), trying standard buttons...`);
+      // Stage 2: Standard Telegram buttons (no non-standard attributes)
+      try {
+        await bot.telegram.sendMessage(grpId, adminTopupText, {
+          parse_mode: 'HTML',
+          reply_markup: standardAdminMarkup
+        });
+        sentToGroup = true;
+        console.log(`✅ [TopUp Alert] Successfully alerted Admin Top-Up Group with standard markup (${grpId}) for tranId: ${tx.tranId}`);
+        break;
+      } catch (errStd) {
+        console.warn(`⚠️ [TopUp Alert] Standard markup alert failed for ${grpId} (${errStd.message}), trying plain text fallback...`);
+        // Stage 3: Plain text without HTML parsing
+        try {
+          await bot.telegram.sendMessage(grpId, plainTopupText, {
+            reply_markup: standardAdminMarkup
+          });
+          sentToGroup = true;
+          console.log(`✅ [TopUp Alert] Successfully alerted Admin Top-Up Group with plain text (${grpId}) for tranId: ${tx.tranId}`);
+          break;
+        } catch (errPlain) {
+          console.error(`❌ [TopUp Alert] All attempts failed for group (${grpId}):`, errPlain.message);
+        }
+      }
     }
-  } else {
-    console.warn('⚠️ [TopUp Alert] ADMIN_TOPUP_GROUP_ID is not configured!');
+  }
+
+  // Backup fallback: if sending to group failed or group is not configured, forward directly to ADMIN_CHAT_ID
+  if (!sentToGroup && ADMIN_CHAT_ID) {
+    try {
+      await bot.telegram.sendMessage(ADMIN_CHAT_ID, adminTopupText, {
+        parse_mode: 'HTML',
+        reply_markup: standardAdminMarkup
+      });
+      console.log(`⚠️ [TopUp Alert Backup] Group alert failed; forwarded directly to ADMIN_CHAT_ID (${ADMIN_CHAT_ID})`);
+    } catch (errBackup) {
+      console.error(`❌ [TopUp Alert Backup] Failed to alert ADMIN_CHAT_ID:`, errBackup.message);
+    }
   }
 
   return { success: true, tx };
@@ -4395,6 +4478,48 @@ const server = http.createServer(async (req, res) => {
       const tranId = data.tranId;
       const displayMerchant = ADMIN_BAKONG_NAME;
 
+      // Start server-side 2.5-second live poller so admin group is alerted even if user minimizes/closes mini app
+      let isPolling = false;
+      const pollInterval = setInterval(async () => {
+        if (isPolling) return;
+        if (processedTopupTrans.has(tranId)) {
+          clearInterval(pollInterval);
+          return;
+        }
+        const tx = pendingTxs.get(tranId);
+        if (!tx) {
+          clearInterval(pollInterval);
+          return;
+        }
+
+        if (checkingTopupTxs.has(tranId)) return;
+        checkingTopupTxs.add(tranId);
+        isPolling = true;
+
+        try {
+          const result = await checkPaymentStatus(tx.tranId, tx.md5);
+          if (result.status === 'PAID' || result.paid === true || result.status === 'SUCCESS') {
+            clearInterval(pollInterval);
+            if (tx.timerId) clearTimeout(tx.timerId);
+            console.log(`⚡ [MiniApp Server Poller] Payment confirmed for tranId: ${tranId}, Amount: $${tx.usdAmount}. Alerting admin top-up group...`);
+            await processSuccessfulTopup(tranId);
+          }
+        } catch (e) {
+          // Ignore background polling glitches
+        } finally {
+          checkingTopupTxs.delete(tranId);
+          isPolling = false;
+        }
+      }, 2500);
+
+      // 3-Minute Live Expiry Timer
+      const timerId = setTimeout(() => {
+        const tx = pendingTxs.get(tranId);
+        if (!tx) return;
+        if (tx.pollInterval) clearInterval(tx.pollInterval);
+        pendingTxs.delete(tranId);
+      }, 3 * 60 * 1000);
+
       // Save pending transaction with 3-minute live poller & expiry
       pendingTxs.set(tranId, {
         userId,
@@ -4415,6 +4540,8 @@ const server = http.createServer(async (req, res) => {
         qrString: data.qrString,
         deepLink: null,
         androidIntent: null,
+        timerId,
+        pollInterval,
         expiresAt: Date.now() + 3 * 60 * 1000
       });
 
@@ -4493,6 +4620,34 @@ const server = http.createServer(async (req, res) => {
       }
     } catch (err) {
       console.error('API Error /check-status:', err);
+      return sendJson(res, 500, { success: false, error: err.message });
+    }
+  }
+
+  // 3.5. Payment Gateway Webhook Receiver (PayLinkAPI Instant Notification)
+  if (req.method === 'POST' && (
+    pathname === '/api/paylink/webhook' ||
+    pathname === '/api/webhook/paylink' ||
+    pathname === '/api/webhook' ||
+    pathname === '/webhook' ||
+    pathname === '/api/miniapp/topup/webhook'
+  )) {
+    try {
+      const body = await parseJsonBody(req);
+      const tranId = body.tranId || body.id || body.transactionId || body.transaction_id || body.referenceId;
+      const status = String(body.status || body.paymentStatus || '').toUpperCase();
+      const isPaid = body.paid === true || status === 'PAID' || status === 'SUCCESS' || status === 'COMPLETED';
+
+      console.log(`[PayLink Webhook] Received webhook for tranId: ${tranId}, status: ${status}, isPaid: ${isPaid}`);
+
+      if (tranId && isPaid) {
+        const result = await processSuccessfulTopup(tranId);
+        return sendJson(res, 200, { success: true, processed: result });
+      }
+
+      return sendJson(res, 200, { success: true, received: true });
+    } catch (err) {
+      console.error('[PayLink Webhook] Error:', err.message);
       return sendJson(res, 500, { success: false, error: err.message });
     }
   }

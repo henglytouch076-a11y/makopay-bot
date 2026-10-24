@@ -453,6 +453,14 @@
       }
 
       state.activeTx = data;
+      try {
+        localStorage.setItem('mako_active_topup', JSON.stringify({
+          ...data,
+          oneXBetId: state.oneXBetId,
+          amount: finalAmount,
+          createdAt: Date.now()
+        }));
+      } catch (_) {}
       tgHaptic('success');
 
       // Switch to Voucher Display View
@@ -533,11 +541,14 @@
     }
   }
 
-  function startCountdownTimer() {
+  function startCountdownTimer(initialSec = 180) {
     clearInterval(state.countdownInterval);
-    state.secondsLeft = 180; // 3 minutes = 180s
+    state.secondsLeft = (typeof initialSec === 'number' && initialSec > 0) ? initialSec : 180;
     els.voucherTimerSec.textContent = `${state.secondsLeft}s`;
     els.voucherTimerSec.classList.remove('urgent');
+    if (state.secondsLeft <= 30) {
+      els.voucherTimerSec.classList.add('urgent');
+    }
 
     state.countdownInterval = setInterval(() => {
       state.secondsLeft -= 1;
@@ -602,6 +613,7 @@
     // Show success view, hide voucher
     els.topupVoucherView.style.display = 'none';
     els.topupSuccessView.style.display = 'flex';
+    try { localStorage.removeItem('mako_active_topup'); } catch (_) {}
     updateTgBackButton();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -609,12 +621,29 @@
   function returnToTopUpForm() {
     clearInterval(state.pollInterval);
     clearInterval(state.countdownInterval);
+    try { localStorage.removeItem('mako_active_topup'); } catch (_) {}
     els.topupVoucherView.style.display = 'none';
     els.topupSuccessView.style.display = 'none';
     els.topupFormView.style.display = 'flex';
     updateSubmitButtonState();
     updateTgBackButton();
   }
+
+  // Instant Payment Check on App Resume (when user switches back from bank app)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.activeTx?.tranId) {
+      fetch(`${API_BASE}/topup/check-status?tranId=${encodeURIComponent(state.activeTx.tranId)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.paid || data.status === 'PAID') {
+            clearInterval(state.pollInterval);
+            clearInterval(state.countdownInterval);
+            onPaymentSuccess(data);
+          }
+        })
+        .catch(() => {});
+    }
+  });
 
   // ================= WITHDRAW TAB (DIRECT ADMIN CONTACT) =================
   function setupWithdrawForm() {
@@ -988,6 +1017,28 @@
       els.inputOneXBetId.value = state.oneXBetId;
     }
     updateSubmitButtonState();
+
+    // Check & restore any pending active top-up if within 3-minute validity
+    try {
+      const savedTopupStr = localStorage.getItem('mako_active_topup');
+      if (savedTopupStr) {
+        const savedTx = JSON.parse(savedTopupStr);
+        const ageMs = Date.now() - (savedTx.createdAt || 0);
+        if (savedTx?.tranId && ageMs < 180 * 1000) {
+          state.activeTx = savedTx;
+          state.oneXBetId = savedTx.oneXBetId || state.oneXBetId;
+          els.topupFormView.style.display = 'none';
+          els.topupVoucherView.style.display = 'flex';
+          displayVoucherCard(savedTx);
+          const remainSec = Math.max(1, Math.floor((180 * 1000 - ageMs) / 1000));
+          startCountdownTimer(remainSec);
+          startPaymentPoller(savedTx.tranId);
+          updateTgBackButton();
+        } else {
+          localStorage.removeItem('mako_active_topup');
+        }
+      }
+    } catch (_) {}
   }
 
   // Run on DOM ready
