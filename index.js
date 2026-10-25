@@ -2120,23 +2120,42 @@ async function checkPaymentStatus(tranId, md5, tx = null) {
 
 async function checkMembership(ctx, userId) {
   const validStatuses = ['creator', 'administrator', 'member', 'restricted'];
+  // "left" and "kicked" are definitely NOT members
+  const definitelyNotMember = ['left', 'kicked'];
   let channelMember = false;
   let groupMember = false;
   let channelError = null;
   let groupError = null;
 
   try {
-    const member = await ctx.telegram.getChatMember(CHANNEL_ID, userId);
-    channelMember = validStatuses.includes(member.status);
+    const tg = ctx.telegram || ctx;
+    const member = await tg.getChatMember(CHANNEL_ID, userId);
+    if (definitelyNotMember.includes(member.status)) {
+      channelMember = false;
+    } else {
+      channelMember = validStatuses.includes(member.status);
+    }
   } catch (error) {
     channelError = error.response?.description || error.message;
+    // If the API fails (bot not admin, network error, etc.) — fail OPEN:
+    // Don't block the user just because we couldn't verify. Log and allow.
+    console.warn(`[ForceSub] Channel check failed for user ${userId}: ${channelError}. Allowing through.`);
+    channelMember = true;
   }
 
   try {
-    const member = await ctx.telegram.getChatMember(GROUP_ID, userId);
-    groupMember = validStatuses.includes(member.status);
+    const tg = ctx.telegram || ctx;
+    const member = await tg.getChatMember(GROUP_ID, userId);
+    if (definitelyNotMember.includes(member.status)) {
+      groupMember = false;
+    } else {
+      groupMember = validStatuses.includes(member.status);
+    }
   } catch (error) {
     groupError = error.response?.description || error.message;
+    // If the API fails — fail OPEN so legitimate users aren't blocked
+    console.warn(`[ForceSub] Group check failed for user ${userId}: ${groupError}. Allowing through.`);
+    groupMember = true;
   }
 
   return {
