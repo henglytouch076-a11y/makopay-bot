@@ -253,9 +253,9 @@
               <svg viewBox="0 0 24 24" class="btn-inline-svg"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 19l-7-7 7-7"/></svg>
               <span>ត្រឡប់ក្រោយ</span>
             </button>
-            <span class="voucher-status-live">
+            <span id="voucherStatusLive" class="voucher-status-live">
               <span class="radar-dot"></span>
-              កំពុងរង់ចាំទូទាត់...
+              <span id="voucherStatusText">កំពុងរង់ចាំទូទាត់...</span>
             </span>
           </div>
 
@@ -289,10 +289,10 @@
                   <div id="qrCanvasBox"></div>
                   <img id="qrDirectImg" src="" alt="KHQR" style="display:none; width: 194px; height: 194px;" />
                   <div id="qrCenterLogo" class="qr-logo-badge">KHQR</div>
-                  <div id="qrExpiredView" class="qr-expired-curtain" style="display: none;">
-                    <svg viewBox="0 0 24 24" class="curtain-svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="12 6 12 12 16 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                    <span class="curtain-text">កូដបានផុតកំណត់</span>
-                    <span class="curtain-sub">សូមបង្កើតកូដថ្មី</span>
+                  <div id="qrExpiredView" class="qr-expired-curtain" style="display: none;" role="alert" aria-live="assertive">
+                    <span class="curtain-emoji" aria-hidden="true">⌛</span>
+                    <span class="curtain-text">QR បានផុតកំណត់</span>
+                    <span class="curtain-sub">សូមកុំទូទាត់ប្រាក់</span>
                   </div>
                 </div>
               </div>
@@ -307,7 +307,11 @@
               <div class="timer-countdown-row">
                 <svg viewBox="0 0 24 24" class="timer-svg"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="12 6 12 12 16 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <span class="timer-label">រយៈពេលនៅសល់៖</span>
-                <span id="voucherTimerSec" class="timer-seconds">180s</span>
+                <span id="voucherTimerSec" class="timer-seconds">06:00</span>
+              </div>
+              <div class="qr-expiry-warning" role="note">
+                <span class="qr-warning-emoji" aria-hidden="true">🚨</span>
+                <p><strong>QR មានសុពលភាពត្រឹមតែ ៦ នាទីប៉ុណ្ណោះ។</strong><br>បើ QR ផុតកំណត់ សូមកុំទូទាត់ប្រាក់។ រាល់ការទូទាត់ក្រោយពេលផុតកំណត់ យើងខ្ញុំមិនទទួលខុសត្រូវឡើយ។</p>
               </div>
             </div>
 

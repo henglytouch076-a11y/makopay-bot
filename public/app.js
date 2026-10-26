@@ -11,6 +11,7 @@
   const GROUP_LINK = 'https://t.me/makotipsball';
   const SUPPORT_LINK = 'https://t.me/ma_ko168';
   const API_BASE = '/api/miniapp';
+  const QR_EXPIRY_SECONDS = 6 * 60;
 
   // Telegram WebApp Object
   const tg = window.Telegram?.WebApp || null;
@@ -33,7 +34,8 @@
     activeTx: null,
     pollInterval: null,
     countdownInterval: null,
-    secondsLeft: 60,
+    secondsLeft: QR_EXPIRY_SECONDS,
+    isQrExpired: false,
     savedIds: [],
     membershipVerified: false
   };
@@ -127,6 +129,8 @@
 
     // Voucher View Elements
     btnBackFromVoucher: $('btnBackFromVoucher'),
+    voucherStatusLive: $('voucherStatusLive'),
+    voucherStatusText: $('voucherStatusText'),
     voucherBankCard: $('voucherBankCard'),
     voucherHeaderTitle: $('voucherHeaderTitle'),
     voucherBankNameText: $('voucherBankNameText'),
@@ -452,10 +456,14 @@
         throw new Error(data.error || 'បរាជ័យក្នុងការបង្កើតកាតទូទាត់');
       }
 
-      state.activeTx = data;
+      const validForSeconds = Math.max(1, Math.floor(Number(data.expiresInSeconds) || QR_EXPIRY_SECONDS));
+      state.activeTx = {
+        ...data,
+        expiresAt: Date.now() + (validForSeconds * 1000)
+      };
       try {
         localStorage.setItem('mako_active_topup', JSON.stringify({
-          ...data,
+          ...state.activeTx,
           oneXBetId: state.oneXBetId,
           amount: finalAmount,
           createdAt: Date.now()
@@ -466,8 +474,8 @@
       // Switch to Voucher Display View
       els.topupFormView.style.display = 'none';
       els.topupVoucherView.style.display = 'flex';
-      displayVoucherCard(data);
-      startCountdownTimer();
+      displayVoucherCard(state.activeTx);
+      startCountdownTimer(validForSeconds);
       startPaymentPoller(data.tranId);
       updateTgBackButton();
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -507,10 +515,14 @@
       els.khqrScanGuide.textContent = 'Scan with Bakong App or any Mobile Banking App supporting KHQR';
     }
 
-    // Clear and hide expired state
+    // Clear and reset the active payment state
+    state.isQrExpired = false;
     if (els.qrCanvasBox) els.qrCanvasBox.innerHTML = '';
     if (els.qrExpiredView) els.qrExpiredView.style.display = 'none';
     if (els.btnRegenQr) els.btnRegenQr.style.display = 'none';
+    if (els.qrCenterLogo) els.qrCenterLogo.style.display = 'flex';
+    if (els.voucherStatusLive) els.voucherStatusLive.classList.remove('expired');
+    if (els.voucherStatusText) els.voucherStatusText.textContent = 'កំពុងរង់ចាំទូទាត់...';
 
     // Generate QR Code via local library
     if (window.QRCode && tx.qrString) {
@@ -541,28 +553,62 @@
     }
   }
 
-  function startCountdownTimer(initialSec = 180) {
+  function formatCountdown(totalSeconds) {
+    const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+    const minutes = Math.floor(safeSeconds / 60);
+    const seconds = safeSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  function expirePaymentView({ notify = true } = {}) {
+    if (state.isQrExpired) return;
+
+    state.isQrExpired = true;
+    state.secondsLeft = 0;
     clearInterval(state.countdownInterval);
-    state.secondsLeft = (typeof initialSec === 'number' && initialSec > 0) ? initialSec : 180;
-    els.voucherTimerSec.textContent = `${state.secondsLeft}s`;
-    els.voucherTimerSec.classList.remove('urgent');
-    if (state.secondsLeft <= 30) {
+    clearInterval(state.pollInterval);
+    state.countdownInterval = null;
+    state.pollInterval = null;
+
+    if (els.voucherTimerSec) {
+      els.voucherTimerSec.textContent = '00:00';
       els.voucherTimerSec.classList.add('urgent');
+    }
+    if (els.qrExpiredView) els.qrExpiredView.style.display = 'flex';
+    if (els.btnRegenQr) els.btnRegenQr.style.display = 'flex';
+    if (els.qrCenterLogo) els.qrCenterLogo.style.display = 'none';
+    if (els.voucherStatusLive) els.voucherStatusLive.classList.add('expired');
+    if (els.voucherStatusText) els.voucherStatusText.textContent = 'QR ផុតកំណត់';
+
+    state.activeTx = null;
+    try { localStorage.removeItem('mako_active_topup'); } catch (_) {}
+    if (notify) tgHaptic('warning');
+  }
+
+  function startCountdownTimer(initialSec = QR_EXPIRY_SECONDS) {
+    clearInterval(state.countdownInterval);
+    state.secondsLeft = Math.max(0, Math.floor(Number(initialSec) || 0));
+    els.voucherTimerSec.textContent = formatCountdown(state.secondsLeft);
+    els.voucherTimerSec.classList.remove('urgent');
+
+    if (state.secondsLeft <= 60) {
+      els.voucherTimerSec.classList.add('urgent');
+    }
+    if (state.secondsLeft <= 0) {
+      expirePaymentView();
+      return;
     }
 
     state.countdownInterval = setInterval(() => {
-      state.secondsLeft -= 1;
-      els.voucherTimerSec.textContent = `${state.secondsLeft}s`;
+      state.secondsLeft = Math.max(0, state.secondsLeft - 1);
+      els.voucherTimerSec.textContent = formatCountdown(state.secondsLeft);
 
-      if (state.secondsLeft <= 30) {
+      if (state.secondsLeft <= 60) {
         els.voucherTimerSec.classList.add('urgent');
       }
 
       if (state.secondsLeft <= 0) {
-        clearInterval(state.countdownInterval);
-        clearInterval(state.pollInterval);
-        els.qrExpiredView.style.display = 'flex';
-        els.btnRegenQr.style.display = 'flex';
+        expirePaymentView();
       }
     }, 1000);
   }
@@ -583,6 +629,8 @@
           clearInterval(state.pollInterval);
           clearInterval(state.countdownInterval);
           onPaymentSuccess(data);
+        } else if (data.status === 'EXPIRED') {
+          expirePaymentView();
         }
       } catch (_) {
       } finally {
@@ -608,11 +656,13 @@
     els.headerBalanceText.textContent = `$${state.user.balance.toFixed(2)}`;
     els.recOneXBetId.textContent = state.oneXBetId;
     els.recAmount.textContent = `+$${paidAmt.toFixed(2)} USD`;
-    els.recTranId.textContent = state.activeTx?.tranId || '--';
+    els.recTranId.textContent = state.activeTx?.tranId || data.tranId || '--';
 
     // Show success view, hide voucher
     els.topupVoucherView.style.display = 'none';
     els.topupSuccessView.style.display = 'flex';
+    state.activeTx = null;
+    state.isQrExpired = false;
     try { localStorage.removeItem('mako_active_topup'); } catch (_) {}
     updateTgBackButton();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -621,6 +671,8 @@
   function returnToTopUpForm() {
     clearInterval(state.pollInterval);
     clearInterval(state.countdownInterval);
+    state.activeTx = null;
+    state.isQrExpired = false;
     try { localStorage.removeItem('mako_active_topup'); } catch (_) {}
     els.topupVoucherView.style.display = 'none';
     els.topupSuccessView.style.display = 'none';
@@ -639,6 +691,8 @@
             clearInterval(state.pollInterval);
             clearInterval(state.countdownInterval);
             onPaymentSuccess(data);
+          } else if (data.status === 'EXPIRED') {
+            expirePaymentView();
           }
         })
         .catch(() => {});
@@ -1018,22 +1072,29 @@
     }
     updateSubmitButtonState();
 
-    // Check & restore any pending active top-up if within 3-minute validity
+    // Restore an active QR using its original six-minute deadline.
     try {
       const savedTopupStr = localStorage.getItem('mako_active_topup');
       if (savedTopupStr) {
         const savedTx = JSON.parse(savedTopupStr);
-        const ageMs = Date.now() - (savedTx.createdAt || 0);
-        if (savedTx?.tranId && ageMs < 180 * 1000) {
-          state.activeTx = savedTx;
+        const createdAt = Number(savedTx.createdAt) || 0;
+        const expiresAt = Number(savedTx.expiresAt) || (createdAt + QR_EXPIRY_SECONDS * 1000);
+        const remainingMs = expiresAt - Date.now();
+
+        if (savedTx?.tranId) {
+          state.activeTx = { ...savedTx, expiresAt };
           state.oneXBetId = savedTx.oneXBetId || state.oneXBetId;
           els.topupFormView.style.display = 'none';
           els.topupVoucherView.style.display = 'flex';
-          displayVoucherCard(savedTx);
-          const remainSec = Math.max(1, Math.floor((180 * 1000 - ageMs) / 1000));
-          startCountdownTimer(remainSec);
-          startPaymentPoller(savedTx.tranId);
+          displayVoucherCard(state.activeTx);
           updateTgBackButton();
+
+          if (remainingMs > 0) {
+            startCountdownTimer(Math.ceil(remainingMs / 1000));
+            startPaymentPoller(savedTx.tranId);
+          } else {
+            expirePaymentView({ notify: false });
+          }
         } else {
           localStorage.removeItem('mako_active_topup');
         }

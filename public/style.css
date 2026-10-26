@@ -1046,6 +1046,18 @@ body::before {
   animation: pulse 1.8s infinite;
 }
 
+.voucher-status-live.expired {
+  color: #fca5a5;
+  background: rgba(225, 29, 72, 0.12);
+  border-color: rgba(244, 63, 94, 0.35);
+}
+
+.voucher-status-live.expired .radar-dot {
+  background: #f43f5e;
+  box-shadow: 0 0 8px #f43f5e;
+  animation-duration: 0.8s;
+}
+
 /* Authentic Cambodian KHQR Card (Official 273px Design) */
 .khqr-card-wrapper {
   display: flex;
@@ -1240,9 +1252,18 @@ body::before {
   z-index: 20;
 }
 
-.curtain-icon { font-size: 30px; margin-bottom: 2px; }
-.curtain-text { font-size: 14px; font-weight: 800; color: #f43f5e; }
-.curtain-sub { font-size: 11px; color: #94a3b8; }
+.curtain-emoji {
+  display: inline-block;
+  font-size: 34px;
+  line-height: 1;
+  margin-bottom: 8px;
+  transform-origin: center;
+  animation: hourglassFlip 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.55));
+}
+
+.curtain-text { font-size: 15px; font-weight: 900; color: #fb7185; }
+.curtain-sub { margin-top: 3px; font-size: 12px; font-weight: 700; color: #f8fafc; }
 
 .timer-countdown-row {
   display: flex;
@@ -1263,6 +1284,60 @@ body::before {
 .timer-seconds.urgent {
   color: #e11d48;
   animation: pulse 1s infinite;
+}
+
+.qr-expiry-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 11px;
+  color: #fecaca;
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.36), rgba(76, 5, 25, 0.32));
+  border: 1px solid rgba(251, 113, 133, 0.42);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.qr-expiry-warning p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.qr-expiry-warning strong {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.qr-warning-emoji {
+  display: inline-block;
+  flex: 0 0 auto;
+  font-size: 21px;
+  line-height: 1;
+  transform-origin: 50% 85%;
+  animation: warningWiggle 1.15s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px rgba(251, 113, 133, 0.65));
+}
+
+@keyframes warningWiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(-12deg) scale(1.12); }
+  40% { transform: rotate(12deg) scale(1.12); }
+  60% { transform: rotate(-7deg) scale(1.06); }
+  80% { transform: rotate(7deg) scale(1.06); }
+}
+
+@keyframes hourglassFlip {
+  0%, 35% { transform: rotate(0deg) scale(1); }
+  50%, 85% { transform: rotate(180deg) scale(1.12); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qr-warning-emoji,
+  .curtain-emoji {
+    animation: none;
+  }
 }
 
 .voucher-actions-group {

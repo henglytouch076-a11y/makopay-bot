@@ -101,6 +101,9 @@ const PAYLINK_API_KEY = process.env.PAYLINK_API_KEY || 'plk_live_6810457857_ed8a
 const PAYLINK_SECRET = process.env.PAYLINK_SECRET || 'whsec_f61322d1b4d50385';
 const BAKONG_ACCOUNT = process.env.BAKONG_ACCOUNT || 'hengly_touch@bkrt';
 const STORE_NAME = process.env.STORE_NAME || 'MAKO CAMBO';
+const QR_EXPIRY_MINUTES = 6;
+const QR_EXPIRY_MS = QR_EXPIRY_MINUTES * 60 * 1000;
+const QR_EXPIRY_SECONDS = QR_EXPIRY_MINUTES * 60;
 const MOBCASH_APP_URL = process.env.MOBCASH_APP_URL || 'https://tinyurl.com/mobcashnew';
 const MOBCASH_CASHIER_KEY = process.env.MOBCASH_CASHIER_KEY || 'f5e141da52d922e26a661fe750744fef6a15c1777b3970ec36b3c78269409c29';
 const MOBCASH_API_URL = process.env.MOBCASH_API_URL || '';
@@ -1378,14 +1381,22 @@ async function processSuccessfulTopup(tranId) {
     console.log(`[Topup Dedup Guard] Transaction ${tranId} already processed. Suppressing duplicate notification.`);
     return { success: true, alreadyProcessed: true };
   }
-  // Immediately lock transaction before any async operations
-  processedTopupTrans.add(tranId);
 
   const tx = pendingTxs.get(tranId);
   if (!tx) {
-    console.warn(`[Topup Dedup Guard] No pending transaction found for ${tranId}`);
-    return { success: false, error: 'Transaction not found or expired' };
+    console.warn(`[Topup Expiry Guard] No active transaction found for ${tranId}; ignoring late payment.`);
+    return { success: false, expired: true, error: 'Transaction not found or expired' };
   }
+
+  // Never credit or notify admins for a payment confirmed after the QR deadline.
+  if (tx.expiresAt && Date.now() >= tx.expiresAt) {
+    if (tx.pollInterval) clearInterval(tx.pollInterval);
+    console.warn(`[Topup Expiry Guard] Transaction ${tranId} was paid after its ${QR_EXPIRY_MINUTES}-minute deadline; ignoring it.`);
+    return { success: false, expired: true, error: 'Transaction expired before payment confirmation' };
+  }
+
+  // Lock only a valid, active transaction before any asynchronous work starts.
+  processedTopupTrans.add(tranId);
 
   // Clear timers and remove from active pending map
   if (tx.pollInterval) clearInterval(tx.pollInterval);
@@ -2278,6 +2289,8 @@ function getMainMenu(user) {
 <tg-emoji emoji-id="5444856076954520455">🧾</tg-emoji> <b>ដាក់ប្រាក់បានលឿន រហ័សដោយស្វ័យប្រវត្តិ គាំទ្រ KHQR ( <tg-emoji emoji-id="6169985503006296081">🏦</tg-emoji> , <tg-emoji emoji-id="6170487786546661553">🏦</tg-emoji> , <tg-emoji emoji-id="6172533457994909503">🏦</tg-emoji> , <tg-emoji emoji-id="6170287194394069506">🏦</tg-emoji> , <tg-emoji emoji-id="6172439166282893092">🏦</tg-emoji> )</b>
 ⛔️ <b>ហាមបាញ់លុយខ្មែរ ៖ បើបងចង់បង្កើតអាខោនឆាតមក( @ma_ko168 )</b>
 
+${ANIM.SIREN} <b>សូមប្រយ័ត្ន៖ QR មានសុពលភាពត្រឹមតែ ៦ នាទី។ បើ QR ផុតកំណត់ សូមកុំទូទាត់ប្រាក់ ព្រោះយើងខ្ញុំមិនទទួលខុសត្រូវចំពោះការទូទាត់ក្រោយពេលផុតកំណត់ឡើយ។</b>
+
 <tg-emoji emoji-id="5231102735817918643">👇</tg-emoji> <b>សូមជ្រើសរើសប៊ូតុងខាងក្រោម ដើម្បីបន្ត</b>`;
 
   const keyboard = [];
@@ -3014,7 +3027,7 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
     }
 
     const tranId = data.tranId;
-    const expiresAt = Date.now() + 3 * 60 * 1000; // 3 minutes expiry (180 seconds)
+    const expiresAt = Date.now() + QR_EXPIRY_MS; // 6-minute expiry (360 seconds)
 
     // 2. Render authentic Bank KHQR Card: Bakong -> MAKO CAMBO
     const displayMerchant = ADMIN_BAKONG_NAME;
@@ -3041,7 +3054,10 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
       `${ANIM.ONEXBET} <b>ID 1xBet:</b> <code>${oneXBetId}</code>\n` +
       `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> ${amountCaption}\n` +
       `${ANIM.ID} <b>លេខវិក្កយបត្រ:</b> <code>${tranId}</code>\n` +
-      `${ANIM.HOURGLASS} <b>សុពលភាព:</b> <code>3 នាទី</code>\n` +
+      `${ANIM.HOURGLASS} <b>សុពលភាព:</b> <code>៦ នាទី</code>\n` +
+      `━━━━━━━━━━━━━━━\n` +
+      `${ANIM.SIREN} <b>សូមទូទាត់ក្នុងរយៈពេល ៦ នាទីប៉ុណ្ណោះ!</b>\n` +
+      `${ANIM.WARN} <b>បើកូដ KHQR ផុតកំណត់ សូមកុំទូទាត់ប្រាក់។ រាល់ការទូទាត់ក្រោយពេលផុតកំណត់ យើងខ្ញុំមិនទទួលខុសត្រូវឡើយ។</b>\n` +
       `━━━━━━━━━━━━━━━\n` +
       `${ANIM.PHONE} <i>${scanInstruction}</i>\n` +
       `${ANIM.REFRESH} <i>ប្រព័ន្ធត្រួតពិនិត្យស្វ័យប្រវត្តិ (Auto 24/7)...</i>`;
@@ -3089,7 +3105,6 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
         const result = await checkPaymentStatus(tx.tranId, tx.md5);
         if (result.status === 'PAID' || result.paid === true || result.status === 'SUCCESS') {
           clearInterval(pollInterval);
-          clearTimeout(tx.timerId);
           await processSuccessfulTopup(tranId);
         }
       } catch (e) {
@@ -3100,7 +3115,7 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
       }
     }, 6000);
 
-    // 4. Set 3-Minute Live Expiry Timer
+    // 4. Set 6-Minute Live Expiry Timer
     const timerId = setTimeout(async () => {
       const tx = pendingTxs.get(tranId);
       if (!tx) return;
@@ -3111,12 +3126,14 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
       const expiredAmt = `$${tx.usdAmount.toFixed(2)} USD`;
 
       const expiredCaption =
-        `${ANIM.WARN} <b>វិក្កយបត្រផុតកំណត់ (EXPIRED)</b>\n` +
+        `${ANIM.SIREN} <b>វិក្កយបត្រផុតកំណត់ (EXPIRED)</b>\n` +
         `━━━━━━━━━━━━━━━\n` +
-        `${ANIM.LOCK} <i>កូដ KHQR មានសុពលភាព 3 នាទី</i>\n` +
+        `${ANIM.LOCK} <i>កូដ KHQR មានសុពលភាពត្រឹមតែ ៦ នាទី</i>\n` +
         `${ANIM.ONEXBET} <b>ID 1xBet:</b> <code>${oneXBetId}</code>\n` +
         `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> <b>${expiredAmt}</b>\n` +
         `━━━━━━━━━━━━━━━\n` +
+        `${ANIM.WARN} <b>សូមកុំទូទាត់ប្រាក់ទៅកាន់កូដនេះ!</b>\n` +
+        `${ANIM.SIREN} <b>រាល់ការទូទាត់ក្រោយពេលផុតកំណត់ យើងខ្ញុំមិនទទួលខុសត្រូវឡើយ។</b>\n\n` +
         `<i>សូមបង្កើតវិក្កយបត្រថ្មីដើម្បីបន្ត!</i>`;
 
       const expiredMarkup = {
@@ -3150,7 +3167,7 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
           userActiveMsgs.set(chatId, sentExpired.message_id);
         }
       } catch (e) { }
-    }, 3 * 60 * 1000);
+    }, QR_EXPIRY_MS);
 
     // Save pending transaction with timer, pollInterval, bank and currency details
     pendingTxs.set(tranId, {
@@ -3263,6 +3280,11 @@ bot.action(/verify_pay_(.+)/, async (ctx) => {
     return;
   }
 
+  if (tx.expiresAt && Date.now() >= tx.expiresAt) {
+    await ctx.answerCbQuery('🚨 QR បានផុតកំណត់! សូមកុំទូទាត់ប្រាក់ទៅកាន់កូដនេះ។ ការទូទាត់ក្រោយផុតកំណត់ យើងខ្ញុំមិនទទួលខុសត្រូវឡើយ។', { show_alert: true }).catch(() => { });
+    return;
+  }
+
   if (isPayLinkInCooldown()) {
     const sec = getPayLinkCooldownRemaining();
     await ctx.answerCbQuery(`⏳ ប្រព័ន្ធធនាគារកំពុងមមាញឹក (Rate Limit) សូមរង់ចាំ ${sec} វិនាទី រួចចុចពិនិត្យម្ដងទៀត!`, { show_alert: true }).catch(() => { });
@@ -3275,7 +3297,11 @@ bot.action(/verify_pay_(.+)/, async (ctx) => {
     const result = await checkPaymentStatus(tx.tranId, tx.md5);
 
     if (result.status === 'PAID' || result.paid === true || result.status === 'SUCCESS') {
-      await processSuccessfulTopup(tranId);
+      const processing = await processSuccessfulTopup(tranId);
+      if (!processing.success && processing.expired) {
+        await ctx.answerCbQuery('🚨 QR បានផុតកំណត់! សូមកុំទូទាត់ប្រាក់ទៅកាន់កូដនេះ។ ការទូទាត់ក្រោយផុតកំណត់ យើងខ្ញុំមិនទទួលខុសត្រូវឡើយ។', { show_alert: true }).catch(() => { });
+        return;
+      }
       await ctx.answerCbQuery('✅ ការទូទាត់ប្រាក់ជោគជ័យ!').catch(() => { });
       return;
     } else {
@@ -4557,6 +4583,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const tranId = data.tranId;
+      const expiresAt = Date.now() + QR_EXPIRY_MS;
       const displayMerchant = ADMIN_BAKONG_NAME;
 
       // Start server-side 6-second live poller so admin group is alerted even if user minimizes/closes mini app
@@ -4582,7 +4609,6 @@ const server = http.createServer(async (req, res) => {
           const result = await checkPaymentStatus(tx.tranId, tx.md5);
           if (result.status === 'PAID' || result.paid === true || result.status === 'SUCCESS') {
             clearInterval(pollInterval);
-            if (tx.timerId) clearTimeout(tx.timerId);
             console.log(`⚡ [MiniApp Server Poller] Payment confirmed for tranId: ${tranId}, Amount: $${tx.usdAmount}. Alerting admin top-up group...`);
             await processSuccessfulTopup(tranId);
           }
@@ -4594,15 +4620,15 @@ const server = http.createServer(async (req, res) => {
         }
       }, 6000);
 
-      // 3-Minute Live Expiry Timer
+      // 6-Minute Live Expiry Timer
       const timerId = setTimeout(() => {
         const tx = pendingTxs.get(tranId);
         if (!tx) return;
         if (tx.pollInterval) clearInterval(tx.pollInterval);
         pendingTxs.delete(tranId);
-      }, 3 * 60 * 1000);
+      }, QR_EXPIRY_MS);
 
-      // Save pending transaction with 3-minute live poller & expiry
+      // Save pending transaction with the authoritative six-minute expiry
       pendingTxs.set(tranId, {
         userId,
         chatId: userId,
@@ -4624,7 +4650,7 @@ const server = http.createServer(async (req, res) => {
         androidIntent: null,
         timerId,
         pollInterval,
-        expiresAt: Date.now() + 3 * 60 * 1000
+        expiresAt
       });
 
       let qrDataUrl = null;
@@ -4643,7 +4669,9 @@ const server = http.createServer(async (req, res) => {
         bank: 'BAKONG',
         deepLink: null,
         androidIntent: null,
-        merchantName: displayMerchant
+        merchantName: displayMerchant,
+        expiresAt,
+        expiresInSeconds: QR_EXPIRY_SECONDS
       });
     } catch (err) {
       console.error('API Error /create-qr:', err);
@@ -4683,6 +4711,19 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { success: true, status: 'EXPIRED', paid: false });
       }
 
+      // Enforce the deadline even if the JavaScript timeout was delayed.
+      if (tx.expiresAt && Date.now() >= tx.expiresAt) {
+        if (tx.pollInterval) clearInterval(tx.pollInterval);
+        if (tx.timerId) clearTimeout(tx.timerId);
+        pendingTxs.delete(tranId);
+        return sendJson(res, 200, {
+          success: true,
+          status: 'EXPIRED',
+          paid: false,
+          message: 'កូដ KHQR បានផុតកំណត់។ សូមកុំទូទាត់ប្រាក់ទៅកាន់កូដនេះ។'
+        });
+      }
+
       // 1. Cache-first: if recently checked within 4.5 seconds by server poller or previous request, return cached status
       if (tx.lastCheckTime && (Date.now() - tx.lastCheckTime < 4500)) {
         return sendJson(res, 200, { success: true, status: tx.lastStatus || 'PENDING', paid: false });
@@ -4702,7 +4743,15 @@ const server = http.createServer(async (req, res) => {
       try {
         const result = await checkPaymentStatus(tx.tranId, tx.md5);
         if (result.status === 'PAID' || result.paid === true || result.status === 'SUCCESS') {
-          await processSuccessfulTopup(tranId);
+          const processing = await processSuccessfulTopup(tranId);
+          if (!processing.success && processing.expired) {
+            return sendJson(res, 200, {
+              success: true,
+              status: 'EXPIRED',
+              paid: false,
+              message: 'កូដ KHQR បានផុតកំណត់។ ការទូទាត់ក្រោយពេលផុតកំណត់មិនត្រូវបានទទួលស្គាល់ទេ។'
+            });
+          }
           return sendJson(res, 200, {
             success: true,
             status: 'PAID',
