@@ -501,8 +501,12 @@
       els.voucherBankNameText.textContent = isBakong ? 'BAKONG KHQR' : 'ABA PAYWAY';
     }
     const defaultMerchant = isBakong ? 'MAKO CAMBO' : 'MAKO BY S.POV';
+    let merchantName = tx.merchantName || defaultMerchant;
+    if (!isBakong || /H\.T/i.test(merchantName)) {
+      merchantName = 'MAKO BY S.POV';
+    }
     if (els.voucherMerchantNameText) {
-      els.voucherMerchantNameText.textContent = tx.merchantName || defaultMerchant;
+      els.voucherMerchantNameText.textContent = merchantName;
     }
     if (els.voucherIdText) els.voucherIdText.textContent = state.oneXBetId;
     if (els.voucherAmountText) {

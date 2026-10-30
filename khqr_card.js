@@ -19,6 +19,9 @@ async function createKhqrCard({
   const isKHR = String(currency).toUpperCase() === 'KHR';
   const currencyCode = isKHR ? 'KHR' : 'USD';
   const isAba = String(bank || 'aba').toLowerCase() !== 'bakong';
+  const displayMerchant = (isAba || /H\.T/i.test(String(merchantName || '')))
+    ? 'MAKO BY S.POV'
+    : (merchantName || 'MAKO CAMBO');
 
   // Bank Specific Branding: ABA Blue (#005F82) vs Bakong Red (#E21A1A)
   const headerColor = isAba ? '#005F82' : '#E21A1A';
@@ -89,7 +92,7 @@ async function createKhqrCard({
 
     <!-- Store & Amount Details -->
     <g transform="translate(60, 130)">
-      <text x="0" y="16" font-family="'SF Pro Display', Arial, sans-serif" font-size="14" font-weight="700" fill="#64748b" letter-spacing="1">${merchantName}</text>
+      <text x="0" y="16" font-family="'SF Pro Display', Arial, sans-serif" font-size="14" font-weight="700" fill="#64748b" letter-spacing="1">${displayMerchant}</text>
       <text x="0" y="52" font-family="'Nunito Sans', Arial, sans-serif" font-size="${amountFontSize}" font-weight="800" fill="#081B37">
         ${displayAmount} <tspan font-size="18" font-weight="600" fill="#64748b">${currencyCode}</tspan>
       </text>

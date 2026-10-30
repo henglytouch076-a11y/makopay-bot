@@ -392,8 +392,12 @@ const BTN_ICONS = {
 
 // Admin Configuration
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || '6810457857';
-const ADMIN_BANK_NAME = process.env.ADMIN_BANK_NAME || 'MAKO BY S.POV';
-const ADMIN_ABA_NAME = process.env.ADMIN_ABA_NAME || ADMIN_BANK_NAME;
+function sanitizeMerchantName(val, fallback = 'MAKO BY S.POV') {
+  if (!val || /H\.T/i.test(String(val))) return fallback;
+  return String(val).trim();
+}
+const ADMIN_BANK_NAME = sanitizeMerchantName(process.env.ADMIN_BANK_NAME, 'MAKO BY S.POV');
+const ADMIN_ABA_NAME = sanitizeMerchantName(process.env.ADMIN_ABA_NAME, 'MAKO BY S.POV');
 const ADMIN_BAKONG_NAME = process.env.ADMIN_BAKONG_NAME || 'MAKO CAMBO';
 
 function getAdminBankLine(bank = 'aba') {
@@ -2079,7 +2083,7 @@ async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
   const data = await response.json();
   if (isAba) {
     data.bank = 'ABA';
-    data.merchantName = data.merchantName || ADMIN_ABA_NAME || 'MAKO BY S.POV';
+    data.merchantName = 'MAKO BY S.POV';
     if (!data.deepLink && data.qrString) {
       data.deepLink = `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}`;
     }
@@ -3054,7 +3058,7 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
     const expiresAt = Date.now() + QR_EXPIRY_MS; // 6-minute expiry (360 seconds)
 
     // 2. Render authentic Bank KHQR Card
-    const displayMerchant = isAba ? (ADMIN_ABA_NAME || 'MAKO BY S.POV') : ADMIN_BAKONG_NAME;
+    const displayMerchant = isAba ? 'MAKO BY S.POV' : ADMIN_BAKONG_NAME;
 
     const cardBuffer = await createKhqrCard({
       merchantName: displayMerchant,
@@ -4630,7 +4634,7 @@ const server = http.createServer(async (req, res) => {
 
       const tranId = data.tranId;
       const expiresAt = Date.now() + QR_EXPIRY_MS;
-      const displayMerchant = isAba ? (ADMIN_ABA_NAME || 'MAKO BY S.POV') : ADMIN_BAKONG_NAME;
+      const displayMerchant = isAba ? 'MAKO BY S.POV' : ADMIN_BAKONG_NAME;
 
       const computedDeepLink = data.deepLink || (data.qrString ? `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}` : null);
       const computedAndroidIntent = data.androidIntent || (data.qrString ? `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end` : null);
