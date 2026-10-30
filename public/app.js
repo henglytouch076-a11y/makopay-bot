@@ -30,7 +30,7 @@
     oneXBetId: '',
     selectedAmount: 5.00,
     isCustomAmount: false,
-    selectedBank: 'bakong',
+    selectedBank: 'aba',
     activeTx: null,
     pollInterval: null,
     countdownInterval: null,
@@ -145,6 +145,7 @@
     khqrScanGuide: $('khqrScanGuide'),
     voucherBillIdText: $('voucherBillIdText'),
     btnCopyVoucherBill: $('btnCopyVoucherBill'),
+    btnOpenAbaApp: $('btnOpenAbaApp'),
     btnRegenQr: $('btnRegenQr'),
 
     // Top-Up Success Elements
@@ -489,18 +490,19 @@
 
   // ================= DISPLAY VOUCHER & LIVE POLLER =================
   function displayVoucherCard(tx) {
+    const isBakong = (state.selectedBank === 'bakong' || String(tx.bank || '').toLowerCase() === 'bakong') && String(tx.bank || '').toLowerCase() !== 'aba';
     if (els.voucherBankCard) {
-      els.voucherBankCard.className = 'khqr-official-card bakong';
+      els.voucherBankCard.className = `khqr-official-card ${isBakong ? 'bakong' : 'aba'}`;
     }
     if (els.voucherHeaderTitle) {
-      els.voucherHeaderTitle.textContent = 'BAKONG KHQR';
+      els.voucherHeaderTitle.textContent = isBakong ? 'BAKONG KHQR' : 'ABA PAYWAY';
     }
     if (els.voucherBankNameText) {
-      els.voucherBankNameText.textContent = 'BAKONG KHQR';
+      els.voucherBankNameText.textContent = isBakong ? 'BAKONG KHQR' : 'ABA PAYWAY';
     }
-    const merchantName = 'MAKO CAMBO';
+    const defaultMerchant = isBakong ? 'MAKO CAMBO' : 'MAKO by H.T';
     if (els.voucherMerchantNameText) {
-      els.voucherMerchantNameText.textContent = tx.merchantName || merchantName;
+      els.voucherMerchantNameText.textContent = tx.merchantName || defaultMerchant;
     }
     if (els.voucherIdText) els.voucherIdText.textContent = state.oneXBetId;
     if (els.voucherAmountText) {
@@ -508,11 +510,13 @@
     }
     if (els.voucherBillIdText) els.voucherBillIdText.textContent = tx.tranId;
     if (els.qrCenterLogo) {
-      els.qrCenterLogo.textContent = 'KHQR';
-      els.qrCenterLogo.style.background = '#E21A1A';
+      els.qrCenterLogo.textContent = isBakong ? 'KHQR' : 'ABA';
+      els.qrCenterLogo.style.background = isBakong ? '#E21A1A' : '#005F82';
     }
     if (els.khqrScanGuide) {
-      els.khqrScanGuide.textContent = 'Scan with Bakong App or any Mobile Banking App supporting KHQR';
+      els.khqrScanGuide.textContent = isBakong
+        ? 'Scan with Bakong App or other Mobile Banking App supporting KHQR'
+        : 'Scan with ABA Mobile, or other Mobile Banking App supporting KHQR';
     }
 
     // Clear and reset the active payment state
@@ -542,6 +546,29 @@
       }
     } else {
       fallbackQrImage(tx);
+    }
+
+    // Direct ABA Mobile App button (Enabled for ABA payments)
+    if (!isBakong && els.btnOpenAbaApp) {
+      const qrStr = tx.qrString || '';
+      const deepLink = tx.deepLink || (qrStr ? `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(qrStr)}` : null);
+
+      if (deepLink || qrStr) {
+        els.btnOpenAbaApp.style.display = 'flex';
+        els.btnOpenAbaApp.onclick = () => {
+          tgHaptic('medium');
+          const payAbaUrl = `${window.location.origin}/pay-aba?tranId=${encodeURIComponent(tx.tranId)}&qr=${encodeURIComponent(qrStr)}`;
+          if (window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.openLink === 'function') {
+            window.Telegram.WebApp.openLink(payAbaUrl);
+          } else {
+            window.location.href = deepLink || payAbaUrl;
+          }
+        };
+      } else {
+        els.btnOpenAbaApp.style.display = 'none';
+      }
+    } else if (els.btnOpenAbaApp) {
+      els.btnOpenAbaApp.style.display = 'none';
     }
   }
 
@@ -576,6 +603,7 @@
     }
     if (els.qrExpiredView) els.qrExpiredView.style.display = 'flex';
     if (els.btnRegenQr) els.btnRegenQr.style.display = 'flex';
+    if (els.btnOpenAbaApp) els.btnOpenAbaApp.style.display = 'none';
     if (els.qrCenterLogo) els.qrCenterLogo.style.display = 'none';
     if (els.voucherStatusLive) els.voucherStatusLive.classList.add('expired');
     if (els.voucherStatusText) els.voucherStatusText.textContent = 'QR ផុតកំណត់';

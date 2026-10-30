@@ -6,24 +6,27 @@ const QRCode = require('qrcode');
  * Supports both USD ($) and KHR (៛) currencies with automatic formatting and dynamic layout.
  */
 async function createKhqrCard({
-  merchantName = 'MAKO CAMBO',
+  merchantName = 'MAKO by H.T',
   amount = '3.00',
   currency = 'USD',
   altAmount = null,
   qrString,
-  bank = 'bakong'
+  bank = 'aba'
 }) {
   const width = 500;
   const height = 750;
 
   const isKHR = String(currency).toUpperCase() === 'KHR';
   const currencyCode = isKHR ? 'KHR' : 'USD';
+  const isAba = String(bank || 'aba').toLowerCase() !== 'bakong';
 
-  // Authentic Bakong KHQR Branding: Official NBC Bakong Red (#E21A1A)
-  const headerColor = '#E21A1A';
-  const headerTitle = 'BAKONG KHQR';
-  const footerMain = 'Scan to Pay with Banking App';
-  const footerSub = 'Bakong or any Mobile Banking App supporting KHQR';
+  // Bank Specific Branding: ABA Blue (#005F82) vs Bakong Red (#E21A1A)
+  const headerColor = isAba ? '#005F82' : '#E21A1A';
+  const headerTitle = isAba ? 'ABA PAYWAY' : 'BAKONG KHQR';
+  const footerMain = isAba ? 'Scan to Pay with ABA Mobile' : 'Scan to Pay with Banking App';
+  const footerSub = isAba
+    ? 'ABA Mobile, Bakong, or other App supporting KHQR'
+    : 'Bakong, ABA Mobile, or other App supporting KHQR';
 
   // Format amount cleanly
   let displayAmount = amount;

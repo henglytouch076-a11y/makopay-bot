@@ -812,6 +812,12 @@ body::before {
 }
 
 .bank-select-card.active {
+  background: rgba(0, 95, 130, 0.15);
+  border-color: #005f82;
+  box-shadow: 0 4px 18px rgba(0, 95, 130, 0.25);
+}
+
+.bank-select-card.active[data-bank="bakong"] {
   background: rgba(226, 26, 26, 0.12);
   border-color: #e21a1a;
   box-shadow: 0 4px 18px rgba(226, 26, 26, 0.25);
