@@ -80,11 +80,18 @@ function getWithdrawVideo() {
   return filePath ? { source: filePath } : null;
 }
 
+const cleanTelegramId = (val, fallback) => {
+  if (!val) return fallback;
+  const cleaned = String(val).replace(/['"]/g, '').trim();
+  if (!cleaned || cleaned === 'undefined' || cleaned.startsWith('-537') || cleaned === '-1003960463291') return fallback;
+  return cleaned;
+};
+
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const CHANNEL_ID = process.env.CHANNEL_ID || '-1002180018274';
+const CHANNEL_ID = cleanTelegramId(process.env.CHANNEL_ID, '-1002180018274');
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || '@MakoVIPgroup';
 const CHANNEL_LINK = process.env.CHANNEL_LINK || 'https://t.me/MakoVIPgroup';
-const GROUP_ID = process.env.GROUP_ID || '-1004327966825';
+const GROUP_ID = cleanTelegramId(process.env.GROUP_ID, '-1004327966825');
 const GROUP_USERNAME = process.env.GROUP_USERNAME || '@makotipsball';
 const GROUP_LINK = process.env.GROUP_LINK || 'https://t.me/makotipsball';
 const SUPPORT_USERNAME = process.env.SUPPORT_USERNAME || '@ma_ko168';
@@ -2056,45 +2063,81 @@ async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
   const isAba = String(bank || 'aba').toLowerCase() !== 'bakong';
   const endpoint = isAba ? 'aba' : 'bakong';
   const url = `${PAYLINK_BASE_URL}/api/${endpoint}/generate-qr`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': PAYLINK_API_KEY,
-      'x-secret': PAYLINK_SECRET
-    },
-    body: JSON.stringify({ amount: parseFloat(amount), currency })
-  });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    if (response.status === 429) {
-      let retrySec = 64;
-      try {
-        const parsed = JSON.parse(errorText);
-        if (parsed.retryAfterSeconds) retrySec = parsed.retryAfterSeconds;
-      } catch (_) {}
-      setPayLinkCooldown(retrySec);
-      throw new Error(`RATE_LIMIT:ប្រព័ន្ធធនាគារកំពុងមមាញឹក (Rate Limit) សូមរង់ចាំ ${retrySec} វិនាទី រួចសាកល្បងម្ដងទៀត!`);
+  let lastError = null;
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 18000);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': PAYLINK_API_KEY,
+          'x-secret': PAYLINK_SECRET
+        },
+        body: JSON.stringify({ amount: parseFloat(amount), currency }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 429) {
+          let retrySec = 64;
+          try {
+            const parsed = JSON.parse(errorText);
+            if (parsed.retryAfterSeconds) retrySec = parsed.retryAfterSeconds;
+          } catch (_) {}
+          setPayLinkCooldown(retrySec);
+          throw new Error(`RATE_LIMIT:ប្រព័ន្ធធនាគារកំពុងមមាញឹក (Rate Limit) សូមរង់ចាំ ${retrySec} វិនាទី រួចសាកល្បងម្ដងទៀត!`);
+        }
+
+        // Auto-retry transient server errors (500, 502, 503, 504)
+        if (response.status >= 500 && response.status <= 504 && attempt < maxAttempts) {
+          console.warn(`[KHQR] Attempt ${attempt} returned HTTP ${response.status}. Retrying in 1s...`);
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
+
+        throw new Error(`PayLinkAPI error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      if (isAba) {
+        data.bank = 'ABA';
+        data.merchantName = 'MAKO BY S.POV';
+        if (!data.deepLink && data.qrString) {
+          data.deepLink = `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}`;
+        }
+        if (!data.androidIntent && data.qrString) {
+          data.androidIntent = `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end`;
+        }
+      } else {
+        data.bank = 'BAKONG';
+        data.merchantName = data.merchantName || ADMIN_BAKONG_NAME || 'MAKO CAMBO';
+      }
+      return data;
+    } catch (err) {
+      lastError = err;
+      if (err.name === 'AbortError') {
+        lastError = new Error('PayLinkAPI request timed out');
+      }
+      if (String(err.message).startsWith('RATE_LIMIT:')) {
+        throw err;
+      }
+      if (attempt < maxAttempts) {
+        console.warn(`[KHQR] Attempt ${attempt} error: ${err.message}. Retrying in 1.2s...`);
+        await new Promise(r => setTimeout(r, 1200));
+      }
     }
-    throw new Error(`PayLinkAPI error: ${response.status} - ${errorText}`);
   }
 
-  const data = await response.json();
-  if (isAba) {
-    data.bank = 'ABA';
-    data.merchantName = 'MAKO BY S.POV';
-    if (!data.deepLink && data.qrString) {
-      data.deepLink = `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}`;
-    }
-    if (!data.androidIntent && data.qrString) {
-      data.androidIntent = `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end`;
-    }
-  } else {
-    data.bank = 'BAKONG';
-    data.merchantName = data.merchantName || ADMIN_BAKONG_NAME || 'MAKO CAMBO';
-  }
-  return data;
+  throw lastError;
 }
 
 async function checkPaymentStatus(tranId, md5, tx = null) {
@@ -2155,47 +2198,77 @@ async function checkPaymentStatus(tranId, md5, tx = null) {
 }
 
 
+// Fast in-memory membership cache (TTL: 2 minutes)
+const membershipCache = new Map();
+const MEMBERSHIP_CACHE_TTL_MS = 120 * 1000;
+
 async function checkMembership(ctx, userId) {
+  if (!userId) {
+    return { isMember: true, channelMember: true, groupMember: true, error: null };
+  }
+
+  // 1. Fast path: check in-memory cache (0ms latency!)
+  const cacheKey = String(userId);
+  const cached = membershipCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.result;
+  }
+
   const validStatuses = ['creator', 'administrator', 'member', 'restricted'];
-  // "left" and "kicked" are definitely NOT members
   const definitelyNotMember = ['left', 'kicked'];
   let channelMember = false;
   let groupMember = false;
   let channelError = null;
   let groupError = null;
 
-  try {
-    const tg = ctx.telegram || ctx;
-    const member = await tg.getChatMember(CHANNEL_ID, userId);
-    if (definitelyNotMember.includes(member.status)) {
-      channelMember = false;
-    } else {
-      channelMember = validStatuses.includes(member.status);
-    }
-  } catch (error) {
-    channelError = error.response?.description || error.message;
-    // If the API fails (bot not admin, network error, etc.) — fail OPEN:
-    // Don't block the user just because we couldn't verify. Log and allow.
-    console.warn(`[ForceSub] Channel check failed for user ${userId}: ${channelError}. Allowing through.`);
-    channelMember = true;
-  }
+  const tg = ctx.telegram || ctx;
 
-  try {
-    const tg = ctx.telegram || ctx;
-    const member = await tg.getChatMember(GROUP_ID, userId);
-    if (definitelyNotMember.includes(member.status)) {
-      groupMember = false;
-    } else {
-      groupMember = validStatuses.includes(member.status);
-    }
-  } catch (error) {
-    groupError = error.response?.description || error.message;
-    // If the API fails — fail OPEN so legitimate users aren't blocked
-    console.warn(`[ForceSub] Group check failed for user ${userId}: ${groupError}. Allowing through.`);
-    groupMember = true;
-  }
+  // 2. Run Channel & Group checks concurrently via Promise.allSettled
+  const [channelRes, groupRes] = await Promise.allSettled([
+    // Channel check (ID with username fallback)
+    (async () => {
+      try {
+        const member = await tg.getChatMember(CHANNEL_ID, userId);
+        return !definitelyNotMember.includes(member.status) && validStatuses.includes(member.status);
+      } catch (err) {
+        if (CHANNEL_USERNAME) {
+          try {
+            const member = await tg.getChatMember(CHANNEL_USERNAME, userId);
+            return !definitelyNotMember.includes(member.status) && validStatuses.includes(member.status);
+          } catch (retryErr) {
+            channelError = retryErr.response?.description || retryErr.message;
+            return true; // Fail open
+          }
+        }
+        channelError = err.response?.description || err.message;
+        return true; // Fail open
+      }
+    })(),
+    // Group check (ID with @makotipsball fallback)
+    (async () => {
+      try {
+        const member = await tg.getChatMember(GROUP_ID, userId);
+        return !definitelyNotMember.includes(member.status) && validStatuses.includes(member.status);
+      } catch (err) {
+        if (GROUP_USERNAME) {
+          try {
+            const member = await tg.getChatMember(GROUP_USERNAME, userId);
+            return !definitelyNotMember.includes(member.status) && validStatuses.includes(member.status);
+          } catch (retryErr) {
+            groupError = retryErr.response?.description || retryErr.message;
+            return true; // Fail open
+          }
+        }
+        groupError = err.response?.description || err.message;
+        return true; // Fail open
+      }
+    })()
+  ]);
 
-  return {
+  channelMember = channelRes.status === 'fulfilled' ? channelRes.value : true;
+  groupMember = groupRes.status === 'fulfilled' ? groupRes.value : true;
+
+  const result = {
     isMember: channelMember && groupMember,
     channelMember,
     groupMember,
@@ -2203,6 +2276,14 @@ async function checkMembership(ctx, userId) {
     groupError,
     error: channelError || groupError
   };
+
+  // Cache result for 2 minutes to eliminate repeated network calls
+  membershipCache.set(cacheKey, {
+    result,
+    expiresAt: Date.now() + MEMBERSHIP_CACHE_TTL_MS
+  });
+
+  return result;
 }
 
 // ---------------- MENUS ----------------
@@ -2617,6 +2698,9 @@ bot.on('my_chat_member', (ctx) => {
 bot.action('verify_joined', async (ctx) => {
   const userId = ctx.from.id;
   const user = getUser(userId, ctx.from.first_name);
+
+  // Invalidate cache so fresh check is performed when user explicitly clicks verify
+  membershipCache.delete(String(userId));
 
   try {
     const check = await checkMembership(ctx, userId);
@@ -4551,6 +4635,10 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 400, { success: false, error: 'Missing userId' });
       }
 
+      if (parsedUrl.query?.fresh === '1' || parsedUrl.query?.fresh === 'true') {
+        membershipCache.delete(String(userId));
+      }
+
       const check = await checkMembership(bot, userId);
       return sendJson(res, 200, {
         success: true,
@@ -5202,7 +5290,17 @@ freePort(PORT);
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 Web & Telegram Mini App server running on 0.0.0.0:${PORT}`);
   initHttpsTunnel();
+  // Keep PayLink API warm on Render so it never sleeps and generates QR codes instantly
+  pingPayLinkKeepAlive();
 });
+
+function pingPayLinkKeepAlive() {
+  if (!PAYLINK_BASE_URL || !PAYLINK_BASE_URL.startsWith('http')) return;
+  fetch(`${PAYLINK_BASE_URL}/`, { method: 'GET', signal: AbortSignal.timeout(10000) })
+    .then(r => console.log(`⚡ [PayLink KeepAlive] Upstream online (Status: ${r.status})`))
+    .catch(err => console.warn(`⚠️ [PayLink KeepAlive] Ping warning: ${err.message}`));
+}
+setInterval(pingPayLinkKeepAlive, 240 * 1000);
 
 // Configure Telegram Persistent Menu Button (Bottom Left) — 'MaKo' WebApp Button
 let lastRegisteredMenuUrl = null;

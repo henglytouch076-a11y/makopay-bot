@@ -413,7 +413,9 @@
   }
 
   // ================= GENERATE PAYMENT (KHQR) =================
+  let isGeneratingPayment = false;
   async function generatePayment() {
+    if (isGeneratingPayment) return;
     const finalAmount = getEffectiveAmount();
 
     if (state.oneXBetId.length < 6 || isIdValidInApp === false) {
@@ -427,6 +429,7 @@
       return;
     }
 
+    isGeneratingPayment = true;
     tgHaptic('medium');
     persistOneXBetId(state.oneXBetId);
 
@@ -484,6 +487,7 @@
     } catch (err) {
       alert(err.message || 'មានបញ្ហាក្នុងការបង្កើតកូដ KHQR សូមព្យាយាមម្តងទៀត!');
     } finally {
+      isGeneratingPayment = false;
       updateSubmitButtonState();
     }
   }
@@ -776,7 +780,8 @@
 
     isCheckingMembership = true;
     try {
-      const res = await fetch(`${API_BASE}/check-membership?userId=${encodeURIComponent(state.user.id)}`);
+      const freshParam = isManualClick ? '&fresh=1' : '';
+      const res = await fetch(`${API_BASE}/check-membership?userId=${encodeURIComponent(state.user.id)}${freshParam}`);
       if (!res.ok) throw new Error('Network error');
       const data = await res.json();
 
