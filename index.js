@@ -392,7 +392,7 @@ const BTN_ICONS = {
 
 // Admin Configuration
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || '6810457857';
-const ADMIN_BANK_NAME = process.env.ADMIN_BANK_NAME || 'MAKO H.T';
+const ADMIN_BANK_NAME = process.env.ADMIN_BANK_NAME || 'MAKO BY S.POV';
 const ADMIN_ABA_NAME = process.env.ADMIN_ABA_NAME || ADMIN_BANK_NAME;
 const ADMIN_BAKONG_NAME = process.env.ADMIN_BAKONG_NAME || 'MAKO CAMBO';
 
@@ -1905,7 +1905,7 @@ async function generateAbaPaywayPayment(amount, currency = 'USD') {
     throw new Error('Missing initial PayWay session data');
   }
 
-  const merchantName = paymentLinkData?.transaction_summary?.merchant?.company || ADMIN_ABA_NAME || 'MAKO by H.T';
+  const merchantName = paymentLinkData?.transaction_summary?.merchant?.company || ADMIN_ABA_NAME || 'MAKO BY S.POV';
 
   // Step 1: list-payment-options
   const additionalFields = JSON.stringify({ amount: String(finalAmount) });
@@ -2079,7 +2079,7 @@ async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
   const data = await response.json();
   if (isAba) {
     data.bank = 'ABA';
-    data.merchantName = data.merchantName || ADMIN_ABA_NAME || 'MAKO by H.T';
+    data.merchantName = data.merchantName || ADMIN_ABA_NAME || 'MAKO BY S.POV';
     if (!data.deepLink && data.qrString) {
       data.deepLink = `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}`;
     }
@@ -3054,7 +3054,7 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
     const expiresAt = Date.now() + QR_EXPIRY_MS; // 6-minute expiry (360 seconds)
 
     // 2. Render authentic Bank KHQR Card
-    const displayMerchant = isAba ? (ADMIN_ABA_NAME || 'MAKO by H.T') : ADMIN_BAKONG_NAME;
+    const displayMerchant = isAba ? (ADMIN_ABA_NAME || 'MAKO BY S.POV') : ADMIN_BAKONG_NAME;
 
     const cardBuffer = await createKhqrCard({
       merchantName: displayMerchant,
@@ -3066,9 +3066,6 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
 
     const amountCaption = `<b>$${data.amountFormatted || finalUsdAmount.toFixed(2)} USD</b>`;
     const bankHeader = isAba ? 'ABA KHQR (PayWay)' : 'Bakong KHQR';
-    const scanInstruction = isAba
-      ? 'ស្កេនជាមួយ ABA Mobile ឬគ្រប់ធនាគារទាំងអស់!'
-      : 'ស្កេនជាមួយ Bakong App ឬគ្រប់ធនាគារទាំងអស់!';
     const bankLine = isAba
       ? `${ANIM.ABA} <b>ABA : ${ADMIN_ABA_NAME}</b>`
       : `${ANIM.BAKONG} <b>Bakong : ${ADMIN_BAKONG_NAME}</b>`;
@@ -3077,8 +3074,6 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
     const payAbaUrl = `${liveBaseUrl}/pay-aba?tranId=${encodeURIComponent(tranId)}&amount=${encodeURIComponent(data.amountFormatted || finalUsdAmount.toFixed(2))}&qr=${encodeURIComponent(data.qrString)}`;
 
     const caption =
-      `${ANIM.MONEY} <b>វិក្កយបត្របង់ប្រាក់ ${bankHeader}</b>\n` +
-      `━━━━━━━━━━━━━━━\n` +
       `${bankLine}\n` +
       `${ANIM.DIAMOND} <b>ហាង:</b> <code>${displayMerchant}</code>\n` +
       `${ANIM.CARD} <b>ធនាគារ:</b> <code>${bankName}</code>\n` +
@@ -3089,10 +3084,7 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
       `━━━━━━━━━━━━━━━\n` +
       (isAba ? `📲 <a href="${payAbaUrl}">👉 <b>ចុចទីនេះដើម្បីបើក ABA Mobile ផ្ទាល់</b></a>\n━━━━━━━━━━━━━━━\n` : '') +
       `${ANIM.SIREN} <b>សូមទូទាត់ក្នុងរយៈពេល ៦ នាទីប៉ុណ្ណោះ!</b>\n` +
-      `${ANIM.WARN} <b>បើកូដ KHQR ផុតកំណត់ សូមកុំទូទាត់ប្រាក់។ រាល់ការទូទាត់ក្រោយពេលផុតកំណត់ យើងខ្ញុំមិនទទួលខុសត្រូវឡើយ។</b>\n` +
-      `━━━━━━━━━━━━━━━\n` +
-      `${ANIM.PHONE} <i>${scanInstruction}</i>\n` +
-      `${ANIM.REFRESH} <i>ប្រព័ន្ធត្រួតពិនិត្យស្វ័យប្រវត្តិ (Auto 24/7)...</i>`;
+      `${ANIM.WARN} <b>បើកូដ KHQR ផុតកំណត់ សូមកុំទូទាត់ប្រាក់។ រាល់ការទូទាត់ក្រោយពេលផុតកំណត់ យើងខ្ញុំមិនទទួលខុសត្រូវឡើយ។</b>`;
 
     const buttons = [];
     if (isAba) {
@@ -4638,7 +4630,7 @@ const server = http.createServer(async (req, res) => {
 
       const tranId = data.tranId;
       const expiresAt = Date.now() + QR_EXPIRY_MS;
-      const displayMerchant = isAba ? (ADMIN_ABA_NAME || 'MAKO by H.T') : ADMIN_BAKONG_NAME;
+      const displayMerchant = isAba ? (ADMIN_ABA_NAME || 'MAKO BY S.POV') : ADMIN_BAKONG_NAME;
 
       const computedDeepLink = data.deepLink || (data.qrString ? `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}` : null);
       const computedAndroidIntent = data.androidIntent || (data.qrString ? `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end` : null);

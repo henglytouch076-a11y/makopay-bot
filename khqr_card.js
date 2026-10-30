@@ -6,7 +6,7 @@ const QRCode = require('qrcode');
  * Supports both USD ($) and KHR (៛) currencies with automatic formatting and dynamic layout.
  */
 async function createKhqrCard({
-  merchantName = 'MAKO by H.T',
+  merchantName = 'MAKO BY S.POV',
   amount = '3.00',
   currency = 'USD',
   altAmount = null,

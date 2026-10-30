@@ -500,7 +500,7 @@
     if (els.voucherBankNameText) {
       els.voucherBankNameText.textContent = isBakong ? 'BAKONG KHQR' : 'ABA PAYWAY';
     }
-    const defaultMerchant = isBakong ? 'MAKO CAMBO' : 'MAKO by H.T';
+    const defaultMerchant = isBakong ? 'MAKO CAMBO' : 'MAKO BY S.POV';
     if (els.voucherMerchantNameText) {
       els.voucherMerchantNameText.textContent = tx.merchantName || defaultMerchant;
     }
