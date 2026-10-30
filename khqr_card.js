@@ -6,7 +6,7 @@ const QRCode = require('qrcode');
  * Supports both USD ($) and KHR (៛) currencies with automatic formatting and dynamic layout.
  */
 async function createKhqrCard({
-  merchantName = 'MAKO BY S.POV',
+  merchantName = 'TOUCH HENGLY',
   amount = '3.00',
   currency = 'USD',
   altAmount = null,
@@ -19,9 +19,9 @@ async function createKhqrCard({
   const isKHR = String(currency).toUpperCase() === 'KHR';
   const currencyCode = isKHR ? 'KHR' : 'USD';
   const isAba = String(bank || 'aba').toLowerCase() !== 'bakong';
-  const displayMerchant = (isAba || /H\.T/i.test(String(merchantName || '')))
-    ? 'MAKO BY S.POV'
-    : (merchantName || 'MAKO CAMBO');
+  const displayMerchant = (isAba || /H\.T|S\.POV/i.test(String(merchantName || '')))
+    ? 'TOUCH HENGLY'
+    : (merchantName || 'TOUCH HENGLY');
 
   // Bank Specific Branding: ABA Blue (#005F82) vs Bakong Red (#E21A1A)
   const headerColor = isAba ? '#005F82' : '#E21A1A';

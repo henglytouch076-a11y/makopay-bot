@@ -107,7 +107,7 @@ const PAYLINK_BASE_URL = (process.env.PAYLINK_BASE_URL || 'https://paylinkapi-bo
 const PAYLINK_API_KEY = process.env.PAYLINK_API_KEY || 'plk_live_6810457857_ed8a2a0f';
 const PAYLINK_SECRET = process.env.PAYLINK_SECRET || 'whsec_f61322d1b4d50385';
 const BAKONG_ACCOUNT = process.env.BAKONG_ACCOUNT || 'hengly_touch@bkrt';
-const STORE_NAME = process.env.STORE_NAME || 'MAKO CAMBO';
+const STORE_NAME = process.env.STORE_NAME || 'MAKO  CAMBO';
 const QR_EXPIRY_MINUTES = 6;
 const QR_EXPIRY_MS = QR_EXPIRY_MINUTES * 60 * 1000;
 const QR_EXPIRY_SECONDS = QR_EXPIRY_MINUTES * 60;
@@ -399,13 +399,13 @@ const BTN_ICONS = {
 
 // Admin Configuration
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || '6810457857';
-function sanitizeMerchantName(val, fallback = 'MAKO BY S.POV') {
-  if (!val || /H\.T/i.test(String(val))) return fallback;
+function sanitizeMerchantName(val, fallback = 'TOUCH HENGLY') {
+  if (!val || /H\.T|S\.POV/i.test(String(val))) return fallback;
   return String(val).trim();
 }
-const ADMIN_BANK_NAME = sanitizeMerchantName(process.env.ADMIN_BANK_NAME, 'MAKO BY S.POV');
-const ADMIN_ABA_NAME = sanitizeMerchantName(process.env.ADMIN_ABA_NAME, 'MAKO BY S.POV');
-const ADMIN_BAKONG_NAME = process.env.ADMIN_BAKONG_NAME || 'MAKO CAMBO';
+const ADMIN_BANK_NAME = sanitizeMerchantName(process.env.ADMIN_BANK_NAME, 'TOUCH HENGLY');
+const ADMIN_ABA_NAME = sanitizeMerchantName(process.env.ADMIN_ABA_NAME, 'TOUCH HENGLY');
+const ADMIN_BAKONG_NAME = sanitizeMerchantName(process.env.ADMIN_BAKONG_NAME, 'TOUCH HENGLY');
 
 function getAdminBankLine(bank = 'aba') {
   const isBakong = String(bank || '').toLowerCase().includes('bakong');
@@ -1916,7 +1916,7 @@ async function generateAbaPaywayPayment(amount, currency = 'USD') {
     throw new Error('Missing initial PayWay session data');
   }
 
-  const merchantName = paymentLinkData?.transaction_summary?.merchant?.company || ADMIN_ABA_NAME || 'MAKO BY S.POV';
+  const merchantName = paymentLinkData?.transaction_summary?.merchant?.company || ADMIN_ABA_NAME || 'TOUCH HENGLY';
 
   // Step 1: list-payment-options
   const additionalFields = JSON.stringify({ amount: String(finalAmount) });
@@ -2110,7 +2110,7 @@ async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
       const data = await response.json();
       if (isAba) {
         data.bank = 'ABA';
-        data.merchantName = 'MAKO BY S.POV';
+        data.merchantName = 'TOUCH HENGLY';
         if (!data.deepLink && data.qrString) {
           data.deepLink = `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}`;
         }
@@ -3142,7 +3142,7 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
     const expiresAt = Date.now() + QR_EXPIRY_MS; // 6-minute expiry (360 seconds)
 
     // 2. Render authentic Bank KHQR Card
-    const displayMerchant = isAba ? 'MAKO BY S.POV' : ADMIN_BAKONG_NAME;
+    const displayMerchant = 'TOUCH HENGLY';
 
     const cardBuffer = await createKhqrCard({
       merchantName: displayMerchant,
@@ -3163,7 +3163,7 @@ async function initiateKhqrPayment(ctx, usdAmount, oneXBetId = 'N/A', currency =
 
     const caption =
       `${bankLine}\n` +
-      `${ANIM.DIAMOND} <b>ហាង:</b> <code>${displayMerchant}</code>\n` +
+      `${ANIM.DIAMOND} <b>ហាង:</b> <code>${STORE_NAME || 'MAKO  CAMBO'}</code>\n` +
       `${ANIM.CARD} <b>ធនាគារ:</b> <code>${bankName}</code>\n` +
       `${ANIM.ONEXBET} <b>ID 1xBet:</b> <code>${oneXBetId}</code>\n` +
       `${ANIM.MONEY} <b>ចំនួនទឹកប្រាក់:</b> ${amountCaption}\n` +
@@ -4722,7 +4722,7 @@ const server = http.createServer(async (req, res) => {
 
       const tranId = data.tranId;
       const expiresAt = Date.now() + QR_EXPIRY_MS;
-      const displayMerchant = isAba ? 'MAKO BY S.POV' : ADMIN_BAKONG_NAME;
+      const displayMerchant = 'TOUCH HENGLY';
 
       const computedDeepLink = data.deepLink || (data.qrString ? `abamobilebank://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}` : null);
       const computedAndroidIntent = data.androidIntent || (data.qrString ? `intent://ababank.com?type=payway&qrcode=${encodeURIComponent(data.qrString)}#Intent;scheme=abamobilebank;package=com.ababank.mobile;end` : null);

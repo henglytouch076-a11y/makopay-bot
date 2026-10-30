@@ -35,7 +35,7 @@ services:
       - key: ABA_PAYWAY_URL
         value: "https://link.payway.com.kh/a3550666t"
       - key: STORE_NAME
-        value: "MAKO CAMBO"
+        value: "MAKO  CAMBO"
       - key: ADMIN_GROUP_ID
         value: "-1003960463291"
       - key: ADMIN_TOPUP_GROUP_ID
@@ -55,10 +55,10 @@ services:
       - key: MOBCASH_DOH_DOMAIN
         value: "mob-kassa.bet-1x.com"
       - key: ADMIN_BANK_NAME
-        value: "MAKO BY S.POV"
+        value: "TOUCH HENGLY"
       - key: ADMIN_ABA_NAME
-        value: "MAKO BY S.POV"
+        value: "TOUCH HENGLY"
       - key: ADMIN_BAKONG_NAME
-        value: "MAKO CAMBO"
+        value: "TOUCH HENGLY"
       - key: MINIAPP_URL
         value: "https://makopay-bot.onrender.com"
