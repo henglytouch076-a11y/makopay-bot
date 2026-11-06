@@ -1540,42 +1540,16 @@ async function processSuccessfulTopup(tranId) {
     `${ANIM.RECEIPT} <b>លេខវិក្កយបត្រ:</b> <code>${escapeHtml(tx.tranId)}</code>\n` +
     `<b>កាលបរិច្ឆេទ:</b> <code>${new Date().toLocaleString('km-KH', { timeZone: 'Asia/Phnom_Penh' })}</code>`;
 
+  // Use standard inline keyboard fields so buttons render on every Telegram client.
   const adminTopupMarkup = {
     inline_keyboard: [
       [
         {
-          text: 'បញ្ចូលជោគជ័យ (Done)',
-          callback_data: `adm_td_${tx.tranId}`,
-          icon_custom_emoji_id: BTN_ICONS.SUCCESS,
-          style: 'success'
-        },
-        {
-          text: 'បដិសេធ (Cancel)',
-          callback_data: `adm_tc_${tx.tranId}`,
-          icon_custom_emoji_id: BTN_ICONS.CANCEL,
-          style: 'danger'
-        }
-      ],
-      [
-        {
-          text: `🔍 ពិនិត្យប្រវត្តិ (${tx.oneXBetId})`,
-          callback_data: `grp_chk_${tx.oneXBetId}`,
-          icon_custom_emoji_id: BTN_ICONS.DIAMOND,
-          style: 'primary'
-        }
-      ]
-    ]
-  };
-
-  const standardAdminMarkup = {
-    inline_keyboard: [
-      [
-        {
-          text: 'បញ្ចូលជោគជ័យ (Done)',
+          text: '✅ បញ្ចូលជោគជ័យ (Done)',
           callback_data: `adm_td_${tx.tranId}`
         },
         {
-          text: 'បដិសេធ (Cancel)',
+          text: '❌ បដិសេធ (Cancel)',
           callback_data: `adm_tc_${tx.tranId}`
         }
       ],
@@ -1612,40 +1586,42 @@ async function processSuccessfulTopup(tranId) {
   let sentToGroup = false;
 
   for (const grpId of targetGroups) {
-    // Stage 1: Rich formatted message with custom emojis & styles
     try {
-      await bot.telegram.sendMessage(grpId, adminTopupText, {
-        parse_mode: 'HTML',
-        reply_markup: adminTopupMarkup
-      });
-      sentToGroup = true;
-      console.log(`✅ [TopUp Alert] Successfully alerted Admin Top-Up Group (${grpId}) for tranId: ${tx.tranId}, Amount: $${tx.usdAmount}`);
-      break;
-    } catch (errRich) {
-      console.warn(`⚠️ [TopUp Alert] Rich markup alert failed for ${grpId} (${errRich.message}), trying standard buttons...`);
-      // Stage 2: Standard Telegram buttons (no non-standard attributes)
+      let sentGroupMessage;
+
+      // Send HTML first, but always use the broadly supported standard keyboard.
       try {
-        await bot.telegram.sendMessage(grpId, adminTopupText, {
+        sentGroupMessage = await bot.telegram.sendMessage(grpId, adminTopupText, {
           parse_mode: 'HTML',
-          reply_markup: standardAdminMarkup
+          reply_markup: adminTopupMarkup
         });
-        sentToGroup = true;
-        console.log(`✅ [TopUp Alert] Successfully alerted Admin Top-Up Group with standard markup (${grpId}) for tranId: ${tx.tranId}`);
-        break;
-      } catch (errStd) {
-        console.warn(`⚠️ [TopUp Alert] Standard markup alert failed for ${grpId} (${errStd.message}), trying plain text fallback...`);
-        // Stage 3: Plain text without HTML parsing
-        try {
-          await bot.telegram.sendMessage(grpId, plainTopupText, {
-            reply_markup: standardAdminMarkup
-          });
-          sentToGroup = true;
-          console.log(`✅ [TopUp Alert] Successfully alerted Admin Top-Up Group with plain text (${grpId}) for tranId: ${tx.tranId}`);
-          break;
-        } catch (errPlain) {
-          console.error(`❌ [TopUp Alert] All attempts failed for group (${grpId}):`, errPlain.message);
-        }
+      } catch (htmlError) {
+        console.warn(`⚠️ [TopUp Alert] HTML send failed for ${grpId} (${htmlError.message}); retrying as plain text with buttons...`);
+        sentGroupMessage = await bot.telegram.sendMessage(grpId, plainTopupText, {
+          reply_markup: adminTopupMarkup
+        });
       }
+
+      // Telegram normally echoes reply_markup in the returned Message. If it is
+      // missing, attach the keyboard once more instead of reporting false success.
+      const hasReturnedKeyboard = Array.isArray(sentGroupMessage?.reply_markup?.inline_keyboard)
+        && sentGroupMessage.reply_markup.inline_keyboard.length > 0;
+
+      if (!hasReturnedKeyboard && sentGroupMessage?.message_id) {
+        await bot.telegram.editMessageReplyMarkup(
+          grpId,
+          sentGroupMessage.message_id,
+          undefined,
+          adminTopupMarkup
+        );
+        console.warn(`⚠️ [TopUp Alert] Re-attached missing admin buttons for message ${sentGroupMessage.message_id} in ${grpId}.`);
+      }
+
+      sentToGroup = true;
+      console.log(`✅ [TopUp Alert] Sent Admin Top-Up alert with standard buttons to ${grpId} for tranId: ${tx.tranId}`);
+      break;
+    } catch (groupError) {
+      console.error(`❌ [TopUp Alert] Failed to send alert with buttons to group ${grpId}: ${groupError.message}`);
     }
   }
 
@@ -1654,7 +1630,7 @@ async function processSuccessfulTopup(tranId) {
     try {
       await bot.telegram.sendMessage(ADMIN_CHAT_ID, adminTopupText, {
         parse_mode: 'HTML',
-        reply_markup: standardAdminMarkup
+        reply_markup: adminTopupMarkup
       });
       console.log(`⚠️ [TopUp Alert Backup] Group alert failed; forwarded directly to ADMIN_CHAT_ID (${ADMIN_CHAT_ID})`);
     } catch (errBackup) {
