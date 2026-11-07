@@ -103,9 +103,31 @@ const ADMIN_TOPUP_GROUP_ID = process.env.ADMIN_TOPUP_GROUP_ID || ADMIN_GROUP_ID;
 const ADMIN_WITHDRAW_GROUP_ID = process.env.ADMIN_WITHDRAW_GROUP_ID || '-1003907785147';
 
 // PayLinkAPI Configuration
-const PAYLINK_BASE_URL = (process.env.PAYLINK_BASE_URL || 'https://paylinkapibank.com/api/v2').replace(/\/+$/, '');
-const PAYLINK_API_KEY = process.env.PAYLINK_API_KEY || 'plk_live_std_32781bb88af2d26721c56704ca590a62c09c';
-const PAYLINK_SECRET = process.env.PAYLINK_SECRET || 'whsec_5716e74d3e87cbe50f595c5255d215ab5978cbcc90a6dee3aea64c8c77d2afa9';
+function resolvePayLinkBaseUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw || /paylinkapi-bot\.onrender\.com/i.test(raw)) {
+    return 'https://paylinkapibank.com/api/v2';
+  }
+  return raw.replace(/\/+$/, '');
+}
+function resolvePayLinkApiKey(key) {
+  const raw = String(key || '').trim();
+  if (!raw || /6810457857/i.test(raw)) {
+    return 'plk_live_std_32781bb88af2d26721c56704ca590a62c09c';
+  }
+  return raw;
+}
+function resolvePayLinkSecret(secret) {
+  const raw = String(secret || '').trim();
+  if (!raw || /f61322d1b4d50385/i.test(raw)) {
+    return 'whsec_5716e74d3e87cbe50f595c5255d215ab5978cbcc90a6dee3aea64c8c77d2afa9';
+  }
+  return raw;
+}
+
+const PAYLINK_BASE_URL = resolvePayLinkBaseUrl(process.env.PAYLINK_BASE_URL);
+const PAYLINK_API_KEY = resolvePayLinkApiKey(process.env.PAYLINK_API_KEY);
+const PAYLINK_SECRET = resolvePayLinkSecret(process.env.PAYLINK_SECRET);
 
 function getPayLinkUrl(subPath) {
   const base = (PAYLINK_BASE_URL || 'https://paylinkapibank.com/api/v2').replace(/\/+$/, '');
