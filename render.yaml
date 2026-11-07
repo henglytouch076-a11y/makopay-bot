@@ -25,11 +25,11 @@ services:
       - key: SUPPORT_LINK
         value: "https://t.me/ma_ko168"
       - key: PAYLINK_BASE_URL
-        value: "https://paylinkapi-bot.onrender.com"
+        value: "https://paylinkapibank.com/api/v2"
       - key: PAYLINK_API_KEY
-        sync: false
+        value: "plk_live_std_32781bb88af2d26721c56704ca590a62c09c"
       - key: PAYLINK_SECRET
-        sync: false
+        value: "whsec_5716e74d3e87cbe50f595c5255d215ab5978cbcc90a6dee3aea64c8c77d2afa9"
       - key: BAKONG_ACCOUNT
         value: "hengly_touch@bkrt"
       - key: ABA_PAYWAY_URL

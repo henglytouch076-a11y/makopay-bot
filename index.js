@@ -103,9 +103,20 @@ const ADMIN_TOPUP_GROUP_ID = process.env.ADMIN_TOPUP_GROUP_ID || ADMIN_GROUP_ID;
 const ADMIN_WITHDRAW_GROUP_ID = process.env.ADMIN_WITHDRAW_GROUP_ID || '-1003907785147';
 
 // PayLinkAPI Configuration
-const PAYLINK_BASE_URL = (process.env.PAYLINK_BASE_URL || 'https://paylinkapi-bot.onrender.com').replace(/\/+$/, '');
-const PAYLINK_API_KEY = process.env.PAYLINK_API_KEY || 'plk_live_6810457857_ed8a2a0f';
-const PAYLINK_SECRET = process.env.PAYLINK_SECRET || 'whsec_f61322d1b4d50385';
+const PAYLINK_BASE_URL = (process.env.PAYLINK_BASE_URL || 'https://paylinkapibank.com/api/v2').replace(/\/+$/, '');
+const PAYLINK_API_KEY = process.env.PAYLINK_API_KEY || 'plk_live_std_32781bb88af2d26721c56704ca590a62c09c';
+const PAYLINK_SECRET = process.env.PAYLINK_SECRET || 'whsec_5716e74d3e87cbe50f595c5255d215ab5978cbcc90a6dee3aea64c8c77d2afa9';
+
+function getPayLinkUrl(subPath) {
+  const base = (PAYLINK_BASE_URL || 'https://paylinkapibank.com/api/v2').replace(/\/+$/, '');
+  if (base.endsWith('/api/v2')) {
+    const cleanSub = String(subPath || '').replace(/^\/?(api\/v2\/|api\/)?/, '/');
+    return `${base}${cleanSub}`;
+  }
+  const cleanSub = String(subPath || '').startsWith('/') ? subPath : `/${subPath}`;
+  if (cleanSub.startsWith('/api/')) return `${base}${cleanSub}`;
+  return `${base}/api${cleanSub}`;
+}
 const BAKONG_ACCOUNT = process.env.BAKONG_ACCOUNT || 'hengly_touch@bkrt';
 const STORE_NAME = process.env.STORE_NAME || 'MAKO  CAMBO';
 const QR_EXPIRY_MINUTES = 6;
@@ -2038,7 +2049,7 @@ async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
 
   const isAba = String(bank || 'aba').toLowerCase() !== 'bakong';
   const endpoint = isAba ? 'aba' : 'bakong';
-  const url = `${PAYLINK_BASE_URL}/api/${endpoint}/generate-qr`;
+  const url = getPayLinkUrl(`/${endpoint}/generate-qr`);
 
   let lastError = null;
   const maxAttempts = 3;
@@ -2052,6 +2063,7 @@ async function generateKHQR(amount, currency = 'USD', bank = 'aba') {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${PAYLINK_API_KEY}`,
           'x-api-key': PAYLINK_API_KEY,
           'x-secret': PAYLINK_SECRET
         },
@@ -2141,12 +2153,14 @@ async function checkPaymentStatus(tranId, md5, tx = null) {
   }
 
   const targetMd5 = md5 || transaction?.md5;
-  const url = `${PAYLINK_BASE_URL}/api/web/check-payment`;
+  const url = getPayLinkUrl('/web/check-payment');
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': PAYLINK_API_KEY
+      'Authorization': `Bearer ${PAYLINK_API_KEY}`,
+      'x-api-key': PAYLINK_API_KEY,
+      'x-secret': PAYLINK_SECRET
     },
     body: JSON.stringify({ tranId, md5: targetMd5 })
   });
@@ -5272,7 +5286,8 @@ server.listen(PORT, '0.0.0.0', () => {
 
 function pingPayLinkKeepAlive() {
   if (!PAYLINK_BASE_URL || !PAYLINK_BASE_URL.startsWith('http')) return;
-  fetch(`${PAYLINK_BASE_URL}/`, { method: 'GET', signal: AbortSignal.timeout(10000) })
+  const healthUrl = getPayLinkUrl('/health');
+  fetch(healthUrl, { method: 'GET', signal: AbortSignal.timeout(10000) })
     .then(r => console.log(`⚡ [PayLink KeepAlive] Upstream online (Status: ${r.status})`))
     .catch(err => console.warn(`⚠️ [PayLink KeepAlive] Ping warning: ${err.message}`));
 }
